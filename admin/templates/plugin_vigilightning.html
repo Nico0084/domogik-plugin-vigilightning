@@ -1,0 +1,140 @@
+{% extends theme("base/base.html") %}
+{% import theme("base/wtf.html") as wtf %}
+
+{% block content %}
+{% include theme("client_menu.html") %}
+<script src="https://maps.googleapis.com/maps/api/js?libraries=places&key=AIzaSyD43wvlTg66qR_yPOQOgEG4zeSOMC_ubu4"></script>
+<script type="text/javascript" charset="utf8" src="/plugin_vigilightning/static/js/widget-radius-map.js"></script>
+
+<div class="container">
+    <div class="panel panel-default">
+        <div class="panel-heading"><h5>{% trans %}Lightning vigilance{% endtrans %}</h5></div>
+        <div class="panel-body">
+            {% for loc in locationsList %}
+                <div class="panel panel-default">
+                    <div class="panel-heading">{% trans %}Location{% endtrans %} {{ loc.name }}
+                        <span id="saveparams_{{ loc.id }}" class="btn btn-xs btn-info pull-right hidden" data-toggle="tooltip" data-placement="bottom" title="Save device  localisation parameters.">
+                        <span id="icsaveparams_{{ loc.id }}" class="glyphicon glyphicon-floppy-saved"></span>
+                    </span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="info"></div>
+                        <div id="map-canvas" style="width:100%; height:400px"></div>
+
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="panel panel-default">
+        <div class="panel-heading"><h5>{% trans %}Plugin log{% endtrans %}</h5></div>
+            <div class="panel-body">
+                <p>{{ logfile }}</p>
+                <pre>{{ errorlog }}</pre>
+                <a href="./{{ clientid }}/log" class="btn btn-info" role="button">{% trans %}Display log file{% endtrans %}</a>
+            </div>
+
+    </div>
+</div>
+<script type="text/javascript">
+    var vigiWidgets = {};
+    // ****************** WebSocket resquest *******************
+    function sendRequest(request, data, callback) {
+        $.getJSON('/plugin_vigilightning/{{ clientid }}/request/' + request, data,
+            callback);
+    };
+
+    function getTimeImage(time) {
+        const  prefix = 'strike-t'
+        var current = Math.floor(Date.now() / 1000);
+        var delta =  current - time;
+        if (delta <= 300) {     // 5 mins
+            return prefix + '1';}
+        if (delta <= 600) {      // 10 mins
+            return prefix + '2';}
+        if (delta <= 900) {      // 15 mins
+            return prefix + '3';}
+        if (delta <= 1200) {      // 20 mins
+            return prefix + '4';}
+        if (delta <= 1800) {      // 30 mins
+            return prefix + '5';}
+        return prefix + '6';
+    }
+
+    function vigichanged(self) {
+        $("#saveparams_" + self.device_id).removeClass("hidden");
+        console.log(self);
+    }
+
+    $( document ).ready( function () {
+        // polylines colors : see https://www.w3schools.com/colors/colors_names.asp
+        colors = ['#5F9EA0',
+                  '#8A2BE2',
+                  '#DC143C'];
+        // Init the map
+
+        var map = new google.maps.Map(document.getElementById('map-canvas'), {
+            mapTypeId: 'terrain',
+            center: {lat: 0, lng: 0},
+            scrollwheel: true,
+            zoom: 10
+        });
+        //********* Place devices location
+        {% for data in locationsList %}
+            {% if data.latitude != None and data.longitude != None %}
+                let latLng = new google.maps.LatLng({lat: {{ data.latitude }}, lng: {{ data.longitude }}});
+                map.setCenter(latLng);
+                //****** Add circles for radius
+                vigiWidgets['{{ data.id }}'] = new LocalWidget(map, {{ data|tojson|safe }}, vigichanged);
+
+                //********* Add Strikes
+                {% for strike in data.strikes %}
+                      new google.maps.Marker({
+                          position: {lat: {{ strike.latitude }}, lng: {{ strike.longitude }}},
+                          map: map,
+                          icon: '/plugin_vigilightning/static/images/' + getTimeImage({{ strike.time }}) +'.png',
+                          title: new Date({{ strike.time }}*1000).toLocaleString()
+                        });
+                {% endfor %}
+
+                {% if data.isHome == True %}
+                    map.panTo(new google.maps.LatLng({{ data.latitude }}, {{ data.longitude }}));
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+    })
+    $("[id^='saveparams_']").click(function() {
+        var deviceID = this.id.split("_")[1];
+        $("#icsaveparams_" + deviceID).removeClass("glyphicon-floppy-save").addClass("glyphicon-hourglass");
+        sendRequest("vigilightning.manager.setdeviceparams", {"device_id": deviceID,
+                                                                    "latitude": vigiWidgets[deviceID].position.lat(),
+                                                                    "longitude": vigiWidgets[deviceID].position.lng(),
+                                                                    "approachradius": vigiWidgets[deviceID].approachCircle.distance,
+                                                                    "nearbyradius": vigiWidgets[deviceID].nearbyCircle.distance,
+                                                                    "criticalradius": vigiWidgets[deviceID].criticalCircle.distance}, function(data, result) {
+            $("#icsaveparams_" + deviceID).removeClass("glyphicon-hourglass").addClass("glyphicon-floppy-save");
+            if (data.result == "error") {
+                new PNotify({
+                    type: 'error',
+                    title: 'Fail to save device global parameters.',
+                    text: data.content.error,
+                    delay: 6000
+                });
+            } else {
+                $("#saveparams_" + deviceID).addClass("hidden");
+                new PNotify({
+                    type: 'success',
+                    title: 'Device global parameters saved',
+                    text: "",
+                    delay: 4000
+                });
+            };
+          //  updateBtSavedConf(data.content.deviceID, data.content.saved);
+        });
+    });
+
+</script>
+{% endblock %}

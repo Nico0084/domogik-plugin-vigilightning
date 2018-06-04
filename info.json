@@ -1,0 +1,135 @@
+{
+    "json_version": 2,
+
+    "identity": {
+        "author": "Nicolas V.",
+        "author_email": "nico84dev at gmail.com",
+        "tags": ["Vigilance", "lightning", "thunderstorm"],
+        "dependencies": [{
+                "id": "ws4py (>=0.3.4)",
+                "type": "python"
+            }],
+        "description": "Domogik Plugin for lightning vigilance (blitzortung.org)",
+        "domogik_min_version": "0.5.2",
+        "name": "vigilightning",
+        "type": "plugin",
+        "version": "0.1"
+    },
+
+    "configuration": [{
+            "default": "ws.blitzortung.org",
+            "description": "URL source blitzortung.org websocket data.",
+            "key": "wssource",
+            "name": "data blitzortung.org site",
+            "required": "yes",
+            "type": "string"
+        },{
+            "default": 30,
+            "description": "lightning activity check times (minutes) in calm weather.",
+            "key": "checktimes",
+            "name": "Check times",
+            "required": "yes",
+            "type": "integer"
+        }
+    ],
+
+    "device_types": {
+        "vigilocation": {
+            "description": "Vigilance for lightning strike next to location",
+            "id": "vigilocation",
+            "name": "Lightning vigilance",
+            "commands": [],
+            "sensors": [
+                        "LocationPoint",
+                        "Strike",
+                        "AlertLevel"
+                        ],
+            "parameters": [
+                {
+                    "key": "latitude",
+                    "xpl": false,
+                    "description": "Latitude point to survey.",
+                    "type": "float"
+                },{
+                    "key": "longitude",
+                    "xpl": false,
+                    "description": "Longitude point to survey. (radians)",
+                    "type": "float"
+                },{
+                    "key": "criticalradius",
+                    "xpl": false,
+                    "description": "Radius (km) from the monitoring point to raise a critical alert",
+                    "type": "float",
+                    "default": 1
+                },{
+                    "key": "nearbyradius",
+                    "xpl": false,
+                    "description": "Radius (km) from the monitoring point to raise a nearby alert.",
+                    "type": "float",
+                    "default": 3
+                },{
+                    "key": "approachradius",
+                    "xpl": false,
+                    "description": "Radius (km) from the monitoring point to raise a approach alert.",
+                    "type": "float",
+                    "default": 5
+                },{
+                    "key": "releasetimes",
+                    "xpl": false,
+                    "description": "Release times (minutes) after last strike alert at each back level alert.",
+                    "type": "integer",
+                    "default": 20
+                }
+            ]
+        }
+    },
+
+    "sensors": {
+        "LocationPoint": {
+            "name": "Location monitoring",
+            "data_type": "DT_CoordD",
+            "conversion": "",
+            "incremental": false,
+            "timeout": 0,
+            "history": {
+                "store": false,
+                "duplicate": true,
+                "max": 0,
+                "expire": 0,
+                "round_value": 0
+            }
+        },
+        "Strike": {
+            "name": "Strike coordinates",
+            "data_type": "DT_CoordD",
+            "conversion": "",
+            "incremental": false,
+            "timeout": 0,
+            "history": {
+                "store": true,
+                "duplicate": true,
+                "max": 0,
+                "expire": 0,
+                "round_value": 0
+            }
+        },
+        "AlertLevel": {
+            "name": "Alert level",
+            "data_type": "DT_Number",
+            "conversion": "",
+            "incremental": false,
+            "timeout": 0,
+            "history": {
+                "store": true,
+                "duplicate": true,
+                "max": 0,
+                "expire": 0,
+                "round_value": 0
+            }
+        }
+    },
+
+    "commands": {},
+    "xpl_stats": {},
+    "xpl_commands": {}
+}
