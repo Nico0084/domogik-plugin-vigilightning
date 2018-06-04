@@ -1,4 +1,4 @@
-# Domogik Plugin vigipollens
+# Domogik Plugin vigilightning
 
 ## Purpose
 
