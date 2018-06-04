@@ -1,0 +1,8 @@
+*.pyc
+*.swp
+_build_doc
+*~
+*.20*
+*.directory
+local
+
