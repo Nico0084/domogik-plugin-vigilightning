@@ -1,8 +1,21 @@
 .. _index:
 
-===================
-Plugin vigipollens
-===================
+====================
+Plugin vigiligthning
+====================
+
+.. |icon| image:: icon.png
+    :width: 64px
+
+|icon|
+
+Last changes
+============
+New instructions to apply changes from immediatly previous version.
+
+- 0.1 : (17-07-2018) First publishing release.
+
+- `Previous change <changelog.html>`_
 
 Purpose
 =======
@@ -38,6 +51,7 @@ In Domogik administration section, go to client plugin-vigilithning details page
 | wssource       | ws.blitzortung.org | URL source blitzortung.org websocket data. Normaly no change needed                  |
 +----------------+--------------------+--------------------------------------------------------------------------------------+
 | checktimes     | 30                 | Base check time for lightning activity (minutes).                                    |
+|                |                    |                                                                                      |
 |                |                    | - Value is pause time of source monitoring in calm weather.                          |
 |                |                    | - Half value is source monitoring time in calm weather.                              |
 |                |                    | - Value x1.5  is source monitoring time from the last lightning strike event.        |
@@ -47,21 +61,22 @@ Due to high data flow coming from all world event lightning of website blitzortu
 This process free the serveur source and domogik ressource.
 
 Example for checktime = 30
-    => 15 mn in monitoring from data source (no strike is detected in monitored domogik device, calm mode)
-    => 30 mn in pause (plugin is deconnected from data source).
-    => 15 mn in monitoring (strike event in one of monitored domogik device)
-    => 45 mn in monitoring from the last strike (ligthning mode) ..... (no stike during 45 min, return in calm mode)
-    => 30 mn pause
-    => .....
+
+- => 15 mn in monitoring from data source (no strike is detected in monitored domogik device, calm mode)
+- => 30 mn in pause (plugin is deconnected from data source).
+- => 15 mn in monitoring (strike event in one of monitored domogik device).
+- => 45 mn in monitoring from the last strike (ligthning mode) ..... (no stike during 45 min, return in calm mode).
+- => 30 mn pause.
+- => .....
  
 Create the devices
 ==================
 
 Instance-type : vigiligthning.vigilocation 
-******************************************
+------------------------------------------
 
 Device parameters configuration
--------------------------------
+*******************************
 
 In clients page of admin UI, go to **plugin-rfplayer.<your_host_domogik>**, select tab **"Devices"**, **"New"** to create your devices.
 
@@ -78,7 +93,7 @@ nearbyradius          float  (default 3 km)       Radius (km) from the monitorin
 --------------------- --------------------------- --------------------------------------------------------------------------
 approachradius        float  (default 9 km)       Radius (km) from the monitoring point to raise a approach alert.
 --------------------- --------------------------- --------------------------------------------------------------------------
-releasetimes          float (default 20 mn)      Release times (minutes) after last strike alert at each back level alert.
+releasetimes          float (default 20 mn)       Release times (minutes) after last strike alert at each back level alert.
 ===================== =========================== ==========================================================================
 
 .. note::
@@ -86,21 +101,25 @@ releasetimes          float (default 20 mn)      Release times (minutes) after l
     You can adjust GPS coordinate and radius in any point, and after created device go to admin UI advanced page to set them with precision in google map.
 
 Strike detection description
-----------------------------
+****************************
 
 There are four alert level :
 
 - 0 => calm weather, no strike detected in all monitored circle.
 - 1 => More than 2 strikes are detected in approach circle during the last releasetimes.
-- 2 => more than 1 strike is detected in nearbyradius circle during the last releasetimes
-- 3 => more than 1 strike is detected in criticalradius circle during the last releasetimes
+- 2 => more than 1 strike is detected in nearbyradius circle during the last releasetimes.
+- 3 => more than 1 strike is detected in criticalradius circle during the last releasetimes.
 
-The level alert decrease level by level in release time. But if strikes stop rapidly level could go to 0 in one step. 
+
+The level alert decrease level by level in release time. But if strikes stop rapidly level could go to 0 in one step.
+
 As level rise, if strike appear in critical area level could up to 3 in one step.
 
 Ajust your different radius and times as you need.
-It's depend of your local area and geographical particulars.
-Default values seems a good compromise.
+
+- It's depend of your local area and geographical particulars.
+
+- Default values seems a good compromise.
 
 Start the plugin
 ================
