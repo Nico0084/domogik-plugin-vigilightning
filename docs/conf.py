@@ -12,7 +12,7 @@ master_doc = 'index'
 
 ### part to update ###################################
 project = u'domogik-plugin-vigilightning'
-copyright = u'2018'
+copyright = u'2018, nico84dev'
 version = '0.1'
 release = version
 ######################################################
@@ -21,3 +21,4 @@ pygments_style = 'sphinx'
 
 html_theme = 'default'
 html_static_path = ['_static']
+htmlhelp_basename = project

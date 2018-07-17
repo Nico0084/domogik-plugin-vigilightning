@@ -4,8 +4,28 @@
 *
 * @param {google.maps.Map} map The map on which to attach the localisation widget.
 * @param {data of widget} data The widget param to attach the localisation widget.
-*
-* @constructor
+*/
+
+function getTimeImage(time, reftime) {
+    const  prefix = (reftime == undefined) ? 'cur-strike-t' : 'his-strike-t'
+    let current = (reftime == undefined) ? Math.floor(Date.now() / 1000) : reftime;
+    let delta =  current - time;
+    let num = '6';
+    if (delta <= 120) {     // 2 mins
+        num = '1';}
+    else if (delta <= 240) {     // 4 mins
+        num = '2';}
+    else if (delta <= 400) {     // 7 mins
+        num = '3';}
+    else if (delta <= 600) {     // 10 mins
+        num = '4';}
+    else if (delta <= 900) {    // 15 mins
+        num = '5';}
+    return '/plugin_vigilightning/static/images/'+ prefix + num +'.png';
+}
+
+
+/** @constructor
 */
     function LocalWidget(map, data, callChanged) {
         // Format data to number
@@ -16,9 +36,15 @@
         data.criticalradius = parseFloat(data.criticalradius);
         let latLng = new google.maps.LatLng({lat: data.latitude, lng: data.longitude});
         this.set('map', map);
+        this.map = map;
         this.set('position', latLng);
-        this.callChanged = callChanged
-        this.device_id = data.id
+        this.callChanged = callChanged;
+        this.device_id = data.id;
+        this.strikes = {};
+        this.timerStrikes = {};
+        var self = this;
+        this.alertLevel = 0;
+        this.blinking = null;
 
         // Create new radius widget
         this.approachCircle = this.addRadiusWidget('Approach', {
@@ -54,6 +80,8 @@
                   radius: data.criticalradius
                 });
 
+        setInterval(self.refreshStrikes.bind(this), 10000);
+
         //****** Add markers
         var infowindow = new google.maps.InfoWindow();
 
@@ -64,7 +92,6 @@
           draggable:true
         });
 
-        var self = this
         marker.addListener('click', function() {
             infowindow.setContent('<div id="content">'+
                 '<div id="siteNotice">'+
@@ -123,13 +150,88 @@
         this.bindTo('bounds', rWidget);
         return rWidget
     }
+    LocalWidget.prototype.addStrike = function (strike) {
+        let strikeID = strike.latitude+","+strike.longitude;
+        this.strikes[strikeID] = new google.maps.Marker({
+              position: {lat: strike.latitude, lng: strike.longitude},
+              map: this.map,
+              icon: {url: getTimeImage(strike.time),
+                       origin: new google.maps.Point(16, 32)},
+              title: new Date(strike.time*1000).toLocaleString(),
+              time : strike.time
+        });
+        this.timerStrikes[strikeID] = setInterval(function(strikeID, self) {
+            if (self.strikes[strikeID].time + 30 >= (Date.now() / 1000)) {
+                self.strikes[strikeID].setVisible(!self.strikes[strikeID].getVisible());
+            } else {
+                self.strikes[strikeID].setVisible(true);
+                clearInterval(self.timerStrikes[strikeID]);
+            }
+        }, 300, strikeID, this);
+    }
+    LocalWidget.prototype.deleteStrike = function (strike) {
+        s = this.strikes.indexOf(strike);
+        if (s >= 0) {
+            this.strikes[s].setMap(null)
+            this.strikes.splice(s, 1);
+        }
+    }
+    LocalWidget.prototype.showStrikes = function () {
+        for (s in this.strikes) {
+            this.strikes[s].setMap(this.map);
+        }
+    }
+    LocalWidget.prototype.hideStrikes = function () {
+        for (s in this.strikes) {
+            this.strikes[s].setMap(null);
+        }
+    }
+    LocalWidget.prototype.refreshStrikes = function () {
+        for (s in this.strikes) {
+            this.strikes[s].setIcon(getTimeImage(this.strikes[s].time));
+        }
+    }
+
+    LocalWidget.prototype.handleAlert = function (alertLevel) {
+        this.alertLevel = alertLevel;
+        if (this.alertLevel == 0)  {
+            if (this.blinking != null) {
+                clearInterval(this.blinking);
+                this.blinking = null;
+            }
+        } else {
+            if (this.blinking == null) {
+                this.blinking = setInterval(this.blinkAlert.bind(this), 500);
+            }
+        }
+    }
+
+    LocalWidget.prototype.blinkAlert = function () {
+        switch (this.alertLevel) {
+            case 3 :
+                    this.criticalCircle.circle.setVisible(!this.criticalCircle.circle.getVisible());
+                    if (!this.nearbyCircle.circle.getVisible()) { this.nearbyCircle.circle.setVisible(true);}
+                    if (!this.approachCircle.circle.getVisible()) { this.approachCircle.circle.setVisible(true);}
+                break;
+            case 2 :
+                    this.nearbyCircle.circle.setVisible(!this.nearbyCircle.circle.getVisible());
+                    if (!this.criticalCircle.circle.getVisible()) { this.criticalCircle.circle.setVisible(true);}
+                    if (!this.approachCircle.circle.getVisible()) { this.approachCircle.circle.setVisible(true);}
+                break;
+            case 1 :
+                    this.approachCircle.circle.setVisible(!this.approachCircle.circle.getVisible());
+                    if (!this.nearbyCircle.circle.getVisible()) { this.nearbyCircle.circle.setVisible(true);}
+                    if (!this.criticalCircle.circle.getVisible()) { this.criticalCircle.circle.setVisible(true);}
+                break;
+        }
+    }
     /**
     * A radius widget that add a circle to a map and centers on a marker.
     *
     * @constructor
     */
     function RadiusWidget(name, data) {
-        var circle = new google.maps.Circle({
+        this.circle = new google.maps.Circle({
           strokeColor: data.strokeColor,
           strokeWeight: data.strokeWeight,
           strokeOpacity : data.strokeOpacity,
@@ -144,16 +246,16 @@
         this.set('distance', data.radius);
 
         // Bind the RadiusWidget bounds property to the circle bounds property.
-        this.bindTo('bounds', circle);
+        this.bindTo('bounds', this.circle);
 
         // Bind the circle center to the RadiusWidget center property
-        circle.bindTo('center', this);
+        this.circle.bindTo('center', this);
 
         // Bind the circle map to the RadiusWidget map
-        circle.bindTo('map', this);
+        this.circle.bindTo('map', this);
 
         // Bind the circle radius property to the RadiusWidget radius property
-        circle.bindTo('radius', this);
+        this.circle.bindTo('radius', this);
 
         this.addSizer_();
     }

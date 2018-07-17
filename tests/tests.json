@@ -1,0 +1,8 @@
+{
+    "010_tests" : {
+        "alter_configuration_or_setup" : true,
+        "need_hardware" : false,
+        "criticity" : "high",
+        "automatic" : true
+    }
+}

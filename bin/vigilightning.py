@@ -38,6 +38,7 @@ from ws4py.client.threadedclient import WebSocketClient
 import random
 import time
 import json
+from datetime import datetime
 
 import threading
 import traceback
@@ -45,11 +46,6 @@ import traceback
 class VigiLightningManager(Plugin):
     """ Get lightning vigilances
     """
-
-#    CalmMonitoring = 10.0 * 60.0 # 10 minutes monitoring
-#    OutputMonitoring = 40.0 * 60.0 # 40 minutes monitoring
-    CalmMonitoring = 3.0 * 60.0 # 10 minutes monitoring
-    OutputMonitoring = 5.0 * 60.0 # 40 minutes monitoring
 
     def __init__(self):
         """ Init plugin
@@ -63,10 +59,15 @@ class VigiLightningManager(Plugin):
         # get plugin parameters and web site source parameters
         self.vigiSource = self.get_config("wssource")
         self.checkTimes = self.get_config("checktimes") * 60.0 # convert in second
+        self.CalmMonitoring = self.checkTimes / 2 # X minutes monitoring
+        self.OutputMonitoring = self.checkTimes * 1.5 # X minutes monitoring after last strike
+
         self._lastStrike = {"time": 0.0, "device_id": 0, 'alertLevel': 0}
         self._startCheck = 0.0
         self._EndCheck = 0.0
         self._connexionStatus = "On Wait"
+        self._connexionError = u""
+        self._msg = "Plugin starting..."
 
         # get the devices list
         self.devices = self.get_device_list(quit_if_no_device = False)
@@ -103,7 +104,7 @@ class VigiLightningManager(Plugin):
                         # start the vigipollens thread
                         thr_name = "vigiStrike_{0}".format(device_id)
                         self.vigi_Threads[thr_name] = threading.Thread(None,
-                                                  vigi_List[device_id].HandleAlertLevel,
+                                                  vigi_List[device_id].handleAlertLevel,
                                                   thr_name,
                                                   (),
                                                   {})
@@ -127,6 +128,13 @@ class VigiLightningManager(Plugin):
                     self.log.info(u"Device {0} removed".format(device_id))
 
         self.vigi_List = vigi_List
+
+    def getSensorId(self, device_id, sensor_name):
+        """ get sensor id of a dmgdevice
+        """
+        if sensor_name in self.sensors[device_id] :
+            return self.sensors[device_id][sensor_name]
+        return False
 
     def send_data(self, device_id, device_name, dataSensors):
         """ Send the sensors values over MQ
@@ -153,6 +161,10 @@ class VigiLightningManager(Plugin):
         self._loadDMGDevices()
         self.log.info(u"==> Reload Device called, All updated")
 
+    def publishMsg(self, category, content):
+        self._pub.send_event(category, content)
+        self.log.debug(u"Publishing over MQ <{0}>, data : {1}".format(category, content))
+
     def on_mdp_request(self, msg):
         # display the req message
         Plugin.on_mdp_request(self, msg)
@@ -161,74 +173,71 @@ class VigiLightningManager(Plugin):
         self.log.debug(u"MQ Request {0}".format(msg))
         if action[0] == 'vigilightning' :
             handled = False
+            status = False
+            reason = u""
+            data = msg.get_data()
             self.log.debug(u"Handle MQ request action {0}.".format(action))
+            reply_msg = MQMessage()
+            reply_msg.set_action("{0}.{1}.{2}".format(action[0], action[1], action[2]))
             if action[1] == "manager" :
-                if action[2] == 'getstrikes' :
-                    data = msg.get_data()
-                    reply_msg = MQMessage()
-                    reply_msg.set_action("{0}.{1}.{2}".format(action[0], action[1], action[2]))
+                if action[2] in ['getalertstatus', 'getstrikes', 'getalertevents', 'gethistorystrikes', 'setdeviceparams'] :
                     if 'device_id' in data :
                         handled = True
+                        status = True
+                        data['device_id'] = int(data['device_id'])
+                        reply_msg.add_data('device_id', data['device_id'])
                         if data['device_id'] in self.vigi_List :
-                            report = self.vigi_List[data['device_id']].getStrikes()
-                            # send the reply
-                            reply_msg.add_data('status', True)
-                            reply_msg.add_data('strikes', report)
-                            self.log.debug(u"==> MQ Response {0}".format(report))
-                            self.reply(reply_msg.get())
+                            if action[2] == 'getalertstatus' :
+                                report = self.vigi_List[data['device_id']].getAlertStatus()
+                                reply_msg.add_data('alert', report)
+                            if action[2] == 'getstrikes' :
+                                report = self.vigi_List[data['device_id']].getStrikes()
+                                reply_msg.add_data('strikes', report)
+                            if action[2] == 'getalertevents' :
+                                report = self.vigi_List[data['device_id']].getLastHistoryAlert(int(data['number']))
+                                reply_msg.add_data('events', report)
+                            if action[2] == 'gethistorystrikes' :
+                                eventAlert = {"level": int(data['level']),"begin": float(data['begin']), "end": float(data['end'])}
+                                report = self.vigi_List[data['device_id']].getEventHistoryStrike(eventAlert)
+                                reply_msg.add_data('strikes', report)
+                            if action[2] == 'setdeviceparams' :
+                                for a_device in self.devices :
+                                    if a_device['id'] == data['device_id'] :
+                                        nbParam = 0
+                                        nb = 0
+                                        for p in data :
+                                            if self.getDeviceParamId(a_device, p): nbParam +=1
+                                        for p in data :
+                                            paramid = self.getDeviceParamId(a_device, p)
+                                            if paramid :
+                                                nb += 1
+                                                topublish = (nb == nbParam)
+                                                self.log.debug(u"udpate_device_param {0}: id {1} valule {2}".format(p, paramid, data[p]))
+                                                self.udpate_device_param(paramid, data[p], topublish)
                         else :
-                            reply_msg.add_data('status', False)
-                            reply_msg.add_data('reason', u"Unknown device {0}".format(data['device_id']))
+                            reason = u"Unknown device {0}".format(data['device_id'])
                     else :
-                        reply_msg.add_data('status', False)
-                        reply_msg.add_data('reason', u"Abording command, no extra key 'device_id' in MQ command: {0}".format(data))
-                if action[2] == 'setdeviceparams' :
-                    data = msg.get_data()
-                    reply_msg = MQMessage()
-                    reply_msg.set_action("{0}.{1}.{2}".format(action[0], action[1], action[2]))
-                    if 'device_id' in data :
-                        handled = True
-                        self.log.debug(u"setdeviceparams : {0}".format(self.devices))
-                        self.log.debug(u"setdeviceparams : {0}".format(data.keys()))
-                        for a_device in self.devices :
-                            if a_device['id'] == int(data['device_id']):
-                                nbParam = 0
-                                nb = 0
-                                for p in data :
-                                    if self.getDeviceParamId(a_device, p): nbParam +=1
-                                for p in data :
-                                    paramid = self.getDeviceParamId(a_device, p)
-                                    if paramid :
-                                        nb += 1
-                                        topublish = (nb == nbParam)
-                                        self.log.debug(u"udpate_device_param {0}: id {1} valule {2}".format(p, paramid, data[p]))
-                                        self.udpate_device_param(paramid, data[p], topublish)
-                            # send the reply
-                            reply_msg.add_data('status', True)
-                            self.log.debug(u"==> MQ Response OK")
-                            self.reply(reply_msg.get())
-                        else :
-                            reply_msg.add_data('status', False)
-                            reply_msg.add_data('reason', u"Unknown device {0}".format(data['device_id']))
-                    else :
-                        reply_msg.add_data('status', False)
-                        reply_msg.add_data('reason', u"Abording command, no extra key 'device_id' in MQ command: {0}".format(data))
+                        reason = u"Abording command, no extra key 'device_id' in MQ command: {0}".format(data)
             elif action[1] == "plugin" :
                 if action[2] == 'getlog' :
                     handled = True
-                    data = msg.get_data()
                     report = self.getLoglines(data)
-                    # send the reply
-                    reply_msg = MQMessage()
-                    reply_msg.set_action("{0}.{1}.{2}".format(action[0], action[1], action[2]))
                     for k, item in report.items():
                         reply_msg.add_data(k, item)
-                    self.reply(reply_msg.get())
+                if action[2] == 'getwsstatus' :
+                    handled = True
+                    report = self.getWSStatus()
+                    for k, item in report.items():
+                        reply_msg.add_data(k, item)
             if not handled :
-                self.log.warning(u"MQ request unknown action {0}.".format(action))
-                self.log.warning(u"Abording command, no extra key in command MQ: {0}".format(data))
+                self.log.warning(u"MQ request unknown action {0} : {1}.".format(action, data))
                 reply_msg.add_data('status', False)
-                reply_msg.add_data('reason', u"Abording command, no extra key in MQ command: {0}".format(data))
+                reply_msg.add_data('reason', u"Abording command, unknown action {0} : {1}.".format(action, data))
+                self.reply(reply_msg.get())
+            else :
+                reply_msg.add_data('status', status)
+                reply_msg.add_data('reason', reason)
+                self.reply(reply_msg.get())
 
     def getDeviceParamId(self, device, key):
         if key in device['parameters'] :
@@ -255,32 +264,40 @@ class VigiLightningManager(Plugin):
                 try :
                     checkConnection = False
                     currentTime = time.time()
+                    self._connexionError = u""
+                    msg = ""
                     if self._lastStrike['time'] + self.OutputMonitoring >= currentTime :
                         if self._connexionStatus != "Lightning monitoring" or self._lastStrike['time'] != lastEvent :
-                            self.log.debug(u"**** Status on OutputMonitoring remaining {0:.2f} sec.".format(self._lastStrike['time'] + self.OutputMonitoring - currentTime))
+                            msg = u"Monitoring source on output event mode up to {0}".format(datetime.fromtimestamp(self._lastStrike['time'] + self.OutputMonitoring).strftime('%H:%M:%S (%Y-%m-%d)'))
+                            self.log.debug(msg)
                             lastEvent = self._lastStrike['time']
                         self._connexionStatus = "Lightning monitoring"
                         checkConnection = True
                     else :
                         if self._startCheck + self.CalmMonitoring >= currentTime :
                             if self._connexionStatus != "Calm monitoring" :
-                                self.log.debug(u"**** Status on CalmMonitoring remaining {0:.2f} sec.".format(self._startCheck + self.CalmMonitoring - currentTime))
+                                msg = u"Monitoring source on calm mode up to {0}".format(datetime.fromtimestamp(self._startCheck + self.CalmMonitoring).strftime('%H:%M:%S (%Y-%m-%d)'))
+                                self.log.debug(msg)
                             self._connexionStatus = "Calm monitoring"
                             checkConnection = True
                         elif self._EndCheck + self.checkTimes <= currentTime :
                             if self._connexionStatus != "CheckTimes monitoring" :
-                                self.log.debug(u"+++ Status on checkTimes, restart monitoring.")
+                                msg = u"Status on checkTimes, restart monitoring"
+                                self.log.debug(msg)
                             self._connexionStatus = "CheckTimes monitoring"
                             checkConnection = True
                         else :
                             if self.webSockect is not None :
-                                self.log.debug(u"--- Status no strike, connexion will close")
+                                msg = u"Status no strike, connexion will close"
+                                self.log.debug(msg)
                                 self._EndCheck = currentTime
+                                self.remove_stop_cb(self.webSockect.close);
                                 self.webSockect.close()
                                 self.webSockect = None
                             else :
                                 if self._connexionStatus != "Wait next monitoring" :
-                                    self.log.debug(u"**** Status on wait for {0:.2f} sec., Nothing to do".format((self._EndCheck + self.checkTimes) - currentTime))
+                                    msg = u"Monitoring source on pause, next start at {0}".format(datetime.fromtimestamp(self._EndCheck + self.checkTimes).strftime('%H:%M:%S (%Y-%m-%d)'))
+                                    self.log.debug(msg)
                                 self._connexionStatus = "Wait next monitoring"
                         if checkConnection :
                             self._EndCheck = currentTime
@@ -288,8 +305,11 @@ class VigiLightningManager(Plugin):
                                 self._startCheck = 0
                                 self.createWSClient()
                                 self._startCheck = currentTime
+                        if msg != "" :
+                            self.publishMsg("vigilightning.plugin.getwsstatus", self.getWSStatus(msg))
                 except :
                     self.log.error(u"Check lightning {0} error: {1}".format(self.vigiSource, (traceback.format_exc())))
+                    self._connexionError = u"Fail to connect"
                 self._stop.wait(10)
         except :
             self.log.error(u"Check lightning {0} error: {1}".format(self.vigiSource, (traceback.format_exc())))
@@ -304,21 +324,33 @@ class VigiLightningManager(Plugin):
         try :
             self.webSockect.connect()
             th = threading.Thread(None, self.webSockect.run_forever, "th_WSClient_forever-vigilightining", (), {})
-            self.add_stop_cb(self.webSockect.close);
             self.register_thread(th)
             self.log.info("WSClient start forever mod to {0}".format(url))
             th.start()
+            self.add_stop_cb(self.webSockect.close);
+            self._connexionError = u""
         except :
             self.webSockect = None
             self.log.warning("WSClient to <{0}>, Create error : {1}".format(url, traceback.format_exc()))
+            self._connexionError(u"Fail to connect")
 
     def receivedData(self, data):
         if set(("time", "lat", "lon", "alt", "pol", "mds", "mcg", "sig", "delay",)) <= set(data):
 #            self.log.debug(u"Strike event received, publishing to all vigilance device...")
+            self._connexionError = u""
             for id in self.vigi_List :
                 self.vigi_List[id].receiveStrike(data)
         else :
             self.log.warning(u"Receive unknown data : {0}".format(data))
+            self._connexionError(u"Receive unknown data : {0}".format(data))
+
+    def getWSStatus(self, msg=None):
+        if msg is not None : self._msg = msg
+        report = {'Connected': True if self.webSockect is not None else False,
+            'State': self._connexionStatus,
+            'Msg': self._msg,
+            'Error': self._connexionError}
+        return report
 
 class WSClient(WebSocketClient):
 

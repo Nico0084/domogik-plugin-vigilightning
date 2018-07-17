@@ -2,10 +2,16 @@
 
 ## Purpose
 
-Domogik Plugin for vigilance lightning (source blitzortung.org)
+Domogik Plugin for vigilance lightning (Data source blitzortung.org)
+
 
 This is a package for Domogik : http://www.domogik.org
 Domogik is an open source home automation solution.
+
+"Blitzortung.org" is not an official authority for lightning or thunderstorm data. Just a community collaborative.
+The data on website is provided only for private and entertainment purposes.
+The project "Blitzortung.org" is for the contributors merely a voluntary leisure activity.
+You can [participate](http://en.blitzortung.org/cover_your_area.php) to the project or make a [donation](http://en.blitzortung.org/contact.php#contribution_8) to continue this services free of charge.
 
 ## Documentation
 

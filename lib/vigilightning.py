@@ -30,17 +30,13 @@ Implements
 
 """
 
+import zmq
+from domogikmq.reqrep.client import MQSyncReq
+from domogikmq.message import MQMessage
+
 import traceback
-
-try :
-    # Python3
-    from io import BytesIO as StreamIO
-except :
-    import StringIO as StreamIO
-
 import time
-import math, operator
-import urllib
+import math
 from datetime import datetime
 
 EARTH_RADIUS = 6378137 #  Terre = sphere radius 6378km
@@ -119,7 +115,6 @@ class StrikesList(list):
                     result.append(strike)
         return result
 
-
 class VigiLocation:
     """ handle a dmg_device Vigilightning
     """
@@ -136,10 +131,19 @@ class VigiLocation:
         self._send = send
         self._stop = self.manager.get_stop()
         self.run = False
-        self._alertLevel = 0
         self._direction = ""
         self._strikes = StrikesList([], self._stop)
         self.setDevice(dmgDevice)
+        self._alertLevel = self.getLastAlertLevel()
+        self._status = 'unknown'
+        if self._alertLevel == 0 :
+            self._status = "calm"
+        elif self._alertLevel == 1 :
+            self._status = "in approach"
+        elif self._alertLevel == 2 :
+            self._status = "close to"
+        elif self._alertLevel == 3 :
+            self._status = "critical"
 
     def setDevice(self, dmgDevice):
         if dmgDevice["device_type_id"] == 'vigilocation' :
@@ -157,28 +161,28 @@ class VigiLocation:
             self._send(self.device_id, self.device_name, {'LocationPoint': "{0},{1}".format(self.latitude, self.longitude)})
             self.log.info(u"Device {0} parameters updated.".format(self.device_name))
 
-    def HandleAlertLevel(self):
+    def handleAlertLevel(self):
         """ Handle general level alert
         """
         self.run = True
         self.log.info(u"Start to Handle general level alert for {0}".format(self.device_name))
         while not self._stop.isSet() and self.run:
             try :
-                direction, nbStrike, last = self.computeStrikes(0, 3)
+                direction, nbStrike, last = self.computeStrikesDirecton(0, 3)
                 if nbStrike != 0 :
                     if last['time'] + self.releasetimes < time.time():
                         self.setAlertLevel(2, direction)
                     else :
                         self.setAlertLevel(3, direction)
                 else :
-                    direction, nbStrike, last = self.computeStrikes(0, 2)
+                    direction, nbStrike, last = self.computeStrikesDirecton(0, 2)
                     if nbStrike != 0 :
                         if last['time'] + self.releasetimes < time.time() :
                             self.setAlertLevel(1, direction)
                         else :
                             self.setAlertLevel(2, direction)
                     else :
-                        direction, nbStrike, last = self.computeStrikes(0, 1)
+                        direction, nbStrike, last = self.computeStrikesDirecton(0, 1)
                         if nbStrike != 0 :
                             if last['time'] + self.releasetimes < time.time() :
                                 self.setAlertLevel(0, direction)
@@ -186,6 +190,14 @@ class VigiLocation:
                                 # Check if lightning is in approach
                                 if nbStrike >= 4 : # filter isolate strike
                                     self.setAlertLevel(1, direction)
+                        else :
+                            if self._status != 'calm' :
+                                self.setAlertLevel(0, direction)
+                                self._status = 'calm'
+                                print(u"************ handleAlertLevel, {0}".format(self._status))
+                                self.manager.publishMsg("vigilightning.device.alertstatus", {"device_id": self.device_id,  "device_name": self.device_name,
+                                                                 "AlertLevel": self._alertLevel, "Direction": direction, "Status": self._status, "Msg": self.getAlertMsg()})
+
                 self._stop.wait(1)
             except :
                 self.log.error(u"Check device {0} error: {1}".format(self.device_id, (traceback.format_exc())))
@@ -195,31 +207,69 @@ class VigiLocation:
     def setAlertLevel(self, level, direction):
         if level != self._alertLevel:
             if level < self._alertLevel :
-                self.log.debug(u"Release level {0} to {1}".format(self._alertLevel, level))
                 if level == 0 :
-                    self.log.info(u"End of ligtning alert for {0}".format(self.device_name))
+                    self._status = "end"
                     self._strikes[:] = []
                 elif level == 1 :
-                    self.log.info(u"Lightning roll away to {0}".format(self.device_name))
+                    self._status = "roll away"
                 elif level == 2 :
-                    self.log.info(u"Lightning calms down to {0}".format(self.device_name))
+                    self._status = "calms down"
             else :
-                self.log.debug(u"Increase level {0} to {1}".format(self._alertLevel, level))
                 if level == 1 :
-                    self.log.info(u"Lightning in approach from the {0} to {1}".format(direction, self.device_name))
+                    self._status = "in approach"
                 elif level == 2 :
-                    self.log.info(u"Lightning from the {0} close to {1}".format(direction, self.device_name))
+                    self._status = "close to"
                 elif level == 3 :
-                    self.log.info(u"Critical alert from the {0} for {1}".format(direction, self.device_name))
+                    self._status = "critical"
             self._alertLevel = level
-            self.log.debug(u"************ Set level alert to {0} {1} *****************".format(self._alertLevel, direction))
-            self._send(self.device_id, self.device_name, {'AlertLevel': self._alertLevel})
             self._direction = direction
+            self._send(self.device_id, self.device_name, {'AlertLevel': self._alertLevel})
+            self.manager.publishMsg("vigilightning.device.alertstatus", {"device_id": self.device_id,  "device_name": self.device_name,
+                                             "AlertLevel": self._alertLevel, "Direction": direction, "Status": self._status, "Msg": self.getAlertMsg()})
         if self._direction != direction and self._alertLevel == level:
             self._direction = direction
-            self.log.info(u"************ level alert {0} change direction {1} *****************".format(self._alertLevel, direction))
+            self.manager.publishMsg("vigilightning.device.alertstatus", {"device_id": self.device_id,  "device_name": self.device_name,
+                                             "AlertLevel": self._alertLevel, "Direction": direction, "Status": self._status,
+                                             "Msg": u"Level alert {0} change direction {1}".format(self._alertLevel, direction)})
+
+    def getAlertMsg(self):
+        if self._status == "calm" :
+            msg = u"Calm Weather."
+        elif self._status == "end" :
+            msg = u"End of lightning alert."
+        elif self._status == "roll away" :
+            msg = u"Lightning roll away."
+        elif self._status == "calms down" :
+            msg = u"Lightning calms down."
+        elif self._status == "in approach" :
+            msg = u"Lightning in approach from the {0}.".format(self._direction)
+        elif self._status == "close to" :
+            msg = u"lightning coming from the {0} very close.".format(self._direction)
+        elif self._status == "critical" :
+            msg = u"Critical alert from the {0}.".format(self._direction)
+        else :
+            msg = u"No status defined."
+        return msg
+
+    def getAlertStatus(self):
+        return {"device_id": self.device_id,  "device_name": self.device_name,
+                    "AlertLevel": self._alertLevel, "Direction": self._direction, "Status": self._status,
+                    "Msg": self.getAlertMsg()}
 
     def receiveStrike(self, data):
+            alertLevel, strikeTime, lat, lon, direction = self.computeStrike(data)
+            if alertLevel <> 0 :
+                self.manager.setLastStrikeAlert({"time": strikeTime, "device_id": self.device_id, 'alertLevel': alertLevel})
+                self._strikes.append({"time": strikeTime, 'latitude':  lat, 'longitude':  lon, 'alertLevel': alertLevel, 'direction': direction})
+                toSend = {'CriticalStrike': "{0},{1}".format(lat, lon), "atTimestamp": strikeTime}
+                self._send(self.device_id, self.device_name, toSend)
+                self.manager.publishMsg("vigilightning.device.newstrike", {"device_id": self.device_id,  "device_name": self.device_name,
+                                                 "time": strikeTime, 'latitude':  lat, 'longitude':  lon, 'alertLevel': alertLevel, 'direction': direction})
+
+    def getStrikes(self):
+        return self._strikes
+
+    def computeStrike(self, data):
         rlo1 = math.radians(self.longitude) #  CONVERSION
         rla1 = math.radians(self.latitude)
         rlo2 = math.radians(data['lon'])
@@ -238,8 +288,9 @@ class VigiLocation:
             rAngle=math.acos((math.sin(rla2)-math.sin(rla1)*math.cos(d))/(math.sin(d)*math.cos(rla1)))
         else :
             rAngle=2*math.pi-math.acos((math.sin(rla2)-math.sin(rla1)*math.cos(d))/(math.sin(d)*math.cos(rla1)))
+        alertLevel = 0
+        direction = ""
         if strikeTime + self.releasetimes >= time.time() :
-            alertLevel = 0
             if dkm <= self.criticalradius :
                 alertLevel = 3
             elif dkm <= self.nearbyradius :
@@ -252,13 +303,7 @@ class VigiLocation:
                         datetime.fromtimestamp(data['time']/TIME_FACTOR),
                         dkm, math.degrees(a), direction,
                         data['delay']))
-                self.manager.setLastStrikeAlert({"time": strikeTime, "device_id": self.device_id, 'alertLevel': alertLevel})
-                self._strikes.append({"time": strikeTime, 'latitude':  data['lat'], 'longitude':  data['lon'], 'alertLevel': alertLevel, 'direction': direction})
-                toSend = {'CriticalStrike': "{0},{1}".format(data['lat'], data['lon']), "atTimestamp": data['time']/TIME_FACTOR}
-                self._send(self.device_id, self.device_name, toSend)
-
-    def getStrikes(self):
-        return self._strikes
+        return (alertLevel, strikeTime, data['lat'], data['lon'], direction)
 
     def getDirection(self, angle):
         for d in DIRECTIONS.values() :
@@ -266,7 +311,7 @@ class VigiLocation:
                 return d[0]
         return DIRECTIONS["N"][0]
 
-    def computeStrikes(self, delais=0, level=0):
+    def computeStrikesDirecton(self, delais=0, level=0):
         """ Return a computed direction between all strike at level during specific delais
         """
         strikes = self._strikes.getLastFrom(delais, level)
@@ -282,4 +327,87 @@ class VigiLocation:
 #            self.log.debug(u"Alert level {0} from the {1} ({2} strikes)".format(level, iMax, len(strikes)))
         return iMax, 0 if iMax=="" else stats[iMax], strikes[0] if strikes else []
 
+    def getLastAlertLevel(self):
+        """ Return last alert level history"""
+        sensor_id = self.manager.getSensorId(self.device_id, 'AlertLevel')
+        level = None
+        if sensor_id :
+            cli = MQSyncReq(zmq.Context())
+            msg = MQMessage()
+            msg.set_action('sensor_history.get')
+            msg.add_data('sensor_id', sensor_id)
+            msg.add_data('mode', 'last')
+            msg.add_data('number', 1)
+            res = cli.request('admin', msg.get(), timeout=10)
+            if res is not None :
+                resData = res.get_data()
+                print(u"getLastAlertLevel : {0}".format(resData))
+                if resData['values'] :
+                    level = int(resData['values'][0]['value_num'])
+        return level
 
+    def getLastHistoryAlert(self, number=1):
+        """ Return strike history"""
+        sensor_id = self.manager.getSensorId(self.device_id, 'AlertLevel')
+        if sensor_id :
+            cli = MQSyncReq(zmq.Context())
+            msg = MQMessage()
+            msg.set_action('sensor_history.get')
+            msg.add_data('sensor_id', sensor_id)
+            msg.add_data('mode', 'last')
+            msg.add_data('number', number*7) # 7 = Max process level (0,1,2,3,2,1,0)
+            res = cli.request('admin', msg.get(), timeout=10)
+            strikeEvents = []
+            if res is not None :
+                resData = res.get_data()
+                begin = 0
+                end = 0
+                maxLevel = 0
+                if resData['values'] :
+                    for alert in reversed(resData['values']) :
+                        if alert['value_num'] == 0 :
+                            if end != 0 :
+                                strikeEvents.append({'begin': begin, 'end': alert['timestamp'], 'level': maxLevel})
+                                begin = 0
+                                end = 0
+                                maxLevel = 0
+                        else :
+                            if begin == 0 : begin = alert['timestamp']
+                            end = alert['timestamp']
+                            if maxLevel < alert['value_num']: maxLevel = alert['value_num']
+                    if maxLevel != 0 :
+                        strikeEvents.append({'begin': begin, 'end': 0, 'level': maxLevel})
+                    if len(strikeEvents) > number :
+                        print(u"***** {0} > {1}".format(len(strikeEvents), number))
+                        print(strikeEvents)
+                        strikeEvents = strikeEvents[len(strikeEvents)-number:]
+                        print(strikeEvents)
+                self.log.debug(u"{0} find last event(s):{1}".format(self.device_name, strikeEvents))
+        return strikeEvents
+
+    def getEventHistoryStrike(self, eventAlert):
+        """ Return strike history"""
+        sensor_id = self.manager.getSensorId(self.device_id, 'CriticalStrike')
+        self.log.debug(u"{0} Get history strike(s): {1}".format(self.device_name, eventAlert))
+        strikesList = []
+        if sensor_id :
+            begin = eventAlert['begin'] if eventAlert['begin'] != 0 else time.time()
+            end = eventAlert['end'] if eventAlert['end'] != 0 else time.time()
+            cli = MQSyncReq(zmq.Context())
+            msg = MQMessage()
+            msg.set_action('sensor_history.get')
+            msg.add_data('sensor_id', sensor_id)
+            msg.add_data('mode', 'period')
+            msg.add_data('from', begin)
+            msg.add_data('to', end)
+            res = cli.request('admin', msg.get(), timeout=10)
+            resData = ""
+            if res is not None :
+                resData = res.get_data()
+                self.log.debug(u"{0} find {1} strike(s) for event alert".format(self.device_name, len(resData)))
+                for strike in resData['values'] :
+                    lat, lon = strike['value_str'].split(",")
+                    data = {'time': strike['timestamp']*TIME_FACTOR, 'lat':  float(lat), 'lon':  float(lon), 'delay': 0}
+                    alertLevel, strikeTime, lat, lon, direction = self.computeStrike(data)
+                    strikesList.append({"time": strikeTime, 'latitude':  lat, 'longitude':  lon, 'alertLevel': alertLevel, 'direction': direction})
+        return strikesList

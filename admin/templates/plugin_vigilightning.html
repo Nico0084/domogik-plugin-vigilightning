@@ -3,24 +3,151 @@
 
 {% block content %}
 {% include theme("client_menu.html") %}
+
+<style>
+.spin {
+    -webkit-animation: spin .8s infinite linear;
+    -moz-animation: spin .8s infinite linear;
+    -o-animation: spin .8s infinite linear;
+    animation: spin .8s infinite linear;
+     -webkit-transform-origin: 50% 50%;
+         transform-origin:50% 50%;
+         -ms-transform-origin:50% 50%; /* IE 9 */
+}
+@-moz-keyframes spin {
+  from {
+    -moz-transform: rotate(0deg);
+  }
+  to {
+    -moz-transform: rotate(360deg);
+  }
+}
+
+@-webkit-keyframes spin {
+  from {
+    -webkit-transform: rotate(0deg);
+  }
+  to {
+    -webkit-transform: rotate(360deg);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.signal {
+    border: 5px solid #333;
+    border-radius: 30px;
+    height: 30px;
+    left: 50%;
+    opacity: 0;
+    top: 50%;
+    width: 30px;
+
+    animation: pulsate 1s ease-out;
+    animation-iteration-count: infinite;
+}
+
+@keyframes pulsate {
+    0% {
+      transform: scale(.1);
+      opacity: 0.0;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1.2);
+      opacity: 0;
+    }
+}
+
+.error {
+    border-color: red;
+    color: red;
+}
+.calm {
+    border-color: green;
+    color: green;
+}
+.checktimes {
+    border-color: orange;
+    color: orange;
+}
+.waitnext {
+    border-color: cyan;
+    color: cyan;
+}
+.lightning {
+    border-color: yellow;
+    color: yellow;
+}
+
+</style>
+
 <script src="https://maps.googleapis.com/maps/api/js?libraries=places&key=AIzaSyD43wvlTg66qR_yPOQOgEG4zeSOMC_ubu4"></script>
 <script type="text/javascript" charset="utf8" src="/plugin_vigilightning/static/js/widget-radius-map.js"></script>
 
 <div class="container">
     <div class="panel panel-default">
-        <div class="panel-heading"><h5>{% trans %}Lightning vigilance{% endtrans %}</h5></div>
+        <div class="panel-heading">
+            <div class="row">
+                <div class="col-xs-4">
+                    <h5>{% trans %}Lightning vigilance locations{% endtrans %}</h5>
+                </div>
+                <div class="col-xs-6">
+                    <button class="btn btn-info" onclick="window.open('http://fr.blitzortung.org/live_dynamic_maps.php')">{% trans %}Open Blitzortung live source{% endtrans %}</button>
+                </div>
+                <div class="col-xs-2">
+                    <div class="pull-right">
+                        <div id="wsstatus" class="glyphicon glyphicon-pause fa-3x"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="panel-body">
             {% for loc in locationsList %}
                 <div class="panel panel-default">
-                    <div class="panel-heading">{% trans %}Location{% endtrans %} {{ loc.name }}
-                        <span id="saveparams_{{ loc.id }}" class="btn btn-xs btn-info pull-right hidden" data-toggle="tooltip" data-placement="bottom" title="Save device  localisation parameters.">
-                        <span id="icsaveparams_{{ loc.id }}" class="glyphicon glyphicon-floppy-saved"></span>
-                    </span>
+                    <div class="panel-heading">
+                        <div class="row">
+                            <div class="col-xs-4">
+                                <h4>{{ loc.name }}</h4>
+                            </div>
+                            <div class="col-xs-7">
+                                    <div id="alertinfo_{{ loc.id }}" class='alert alert-warning' role='alert'>{% trans %}Alert status not loaded{% endtrans %}</div>
+                            </div>
+                           <div class="col-xs-1">
+                                <span id="saveparams_{{ loc.id }}" class="btn btn-xs btn-info pull-right hidden" data-toggle="tooltip" data-placement="bottom" title="{% trans %}Save device location parameters{% endtrans %}.">
+                                    <span id="icsaveparams_{{ loc.id }}" class="glyphicon glyphicon-floppy-saved"></span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
                     <div class="panel-body">
-                        <div id="info"></div>
-                        <div id="map-canvas" style="width:100%; height:400px"></div>
-
+                        <div class="col-md-8">
+                            <div id="info"></div>
+                            <div id="map-canvas" style="width:100%; height:400px"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="row">
+                                <label for="historyEvents_{{ loc.id }}">{% trans %}Last{% endtrans %}
+                                    <input type="number" id="eventNum_{{ loc.id }}" step="1" value="1" min="1" max="20"> {% trans %}history alerts{% endtrans %} :
+                                    <span id="loadevent_{{ loc.id }}" class="btn btn-xs btn-info" data-toggle="tooltip" data-placement="bottom" title="{% trans %}Search last n event{% endtrans %}." onclick="showtLastAlertEvents(this)">
+                                        <span id="icloadevent_{{ loc.id }}" class="glyphicon glyphicon-refresh"></span>
+                                    </span>
+                                </label>
+                                <div class="btn-group-vertical" id="historyEvents_{{ loc.id }}">
+                                </div>
+                            </div>
+                            <div class="row" id="historyDisplay_{{ loc.id }}">
+                            </div>
+                        </div>
                     </div>
                 </div>
             {% endfor %}
@@ -41,27 +168,144 @@
 </div>
 <script type="text/javascript">
     var vigiWidgets = {};
+    var historyEvents = {};
+    var historyStrike = {};
+    var map;
     // ****************** WebSocket resquest *******************
     function sendRequest(request, data, callback) {
         $.getJSON('/plugin_vigilightning/{{ clientid }}/request/' + request, data,
             callback);
     };
 
-    function getTimeImage(time) {
-        const  prefix = 'strike-t'
-        var current = Math.floor(Date.now() / 1000);
-        var delta =  current - time;
-        if (delta <= 300) {     // 5 mins
-            return prefix + '1';}
-        if (delta <= 600) {      // 10 mins
-            return prefix + '2';}
-        if (delta <= 900) {      // 15 mins
-            return prefix + '3';}
-        if (delta <= 1200) {      // 20 mins
-            return prefix + '4';}
-        if (delta <= 1800) {      // 30 mins
-            return prefix + '5';}
-        return prefix + '6';
+    function getLastAlertEvents(deviceID, number) {
+        var icLoad = document.getElementById('icloadevent_'+deviceID);
+        icLoad.classList.add('spin');
+        sendRequest("vigilightning.manager.getalertevents", {"device_id": parseInt(deviceID),
+                                                             "number": number},
+                                                             function(data, result) {
+            if (data.result == "error") {
+                new PNotify({
+                    type: 'error',
+                    title: '{% trans %}Fail to get last Alert events{% endtrans %}.',
+                    text: data.content.error,
+                    delay: 6000
+                });
+                historyEvents[deviceID] = [];
+                $("#historyEvents_" + deviceID).html("<div class='alert alert-warning' role='alert'>{% trans %}Fail to get last events{% endtrans %} :( {% trans %}Check if plugin is started{% endtrans %} </div>");
+            } else {
+                new PNotify({
+                    type: 'success',
+                    title: '{% trans %}Last Alert events loaded{% endtrans %}.',
+                    text: "",
+                    delay: 4000
+                });
+                let options = "",
+                    color ="black";
+                for (e=data.content.events.length-1; e >= 0; e--) {
+                    switch (data.content.events[e].level) {
+                        case 1 :
+                            color = "blue";
+                            break;
+                        case 2 :
+                            color = "orange";
+                            break;
+                        case 3 :
+                            color = "red";
+                            break;
+                    }
+                    options +="<button type='button' class='btn btn-default' id='event_"+deviceID+"_"+e+"' onclick='showEventHistoryStrikes(this);'>"+
+                                new Date(data.content.events[e].begin*1000).toLocaleString()+" => "+
+                                new Date(data.content.events[e].end*1000).toLocaleString()+
+                        " <span class='badge' id='bdgEvent_"+deviceID+"_"+e+"' style='background-color: "+color+";margin: 2px 0px 0px 5px;'>"+data.content.events[e].level+"</span>"+
+                      "</button>";
+                }
+                $("#historyEvents_" + deviceID).html(options);
+                historyEvents[deviceID] = data.content.events;
+            };
+            icLoad.classList.remove('spin');
+        });
+    }
+
+    function toggleEventHistoryStrikes(input) {
+        let ref = input.id.split("_");
+        let deviceID = ref[1];
+        let eventNum =  ref[2];
+        let event = historyEvents[deviceID][eventNum];
+        var dmap = map;
+
+        if (input.classList.contains('btn-default')) {
+            input.classList.remove('btn-default');
+            input.classList.add('btn-primary');
+            dmap = map;
+        } else {
+            input.classList.remove('btn-primary');
+            input.classList.add('btn-default');
+            dmap = null;
+        }
+        for (i = 0; i < event.strikes.length; i++) {
+            event.strikes[i].setMap(dmap);
+        }
+    }
+
+    function getHistoryStrikes(input)  {
+        let ref = input.id.split("_");
+        let deviceID = ref[1];
+        let eventNum =  ref[2];
+        let event = historyEvents[deviceID][eventNum];
+        var icLoad = document.getElementById('bdgEvent_'+deviceID+"_"+eventNum);
+        icLoad.classList.add('spin');
+        sendRequest("vigilightning.manager.gethistorystrikes", {"device_id": deviceID,
+                                                             "level": event['level'],
+                                                             "begin": event['begin'],
+                                                             "end": event['end']},
+                                                             function(data, result) {
+            if (data.result == "error") {
+                new PNotify({
+                    type: 'error',
+                    title: '{% trans %}Fail to get history strike Alert{% endtrans %}.',
+                    text: data.content.error,
+                    delay: 6000
+                });
+            } else {
+                new PNotify({
+                    type: 'success',
+                    title: '{% trans %}History strike Alert loaded{% endtrans %}.',
+                    text: "",
+                    delay: 4000
+                });
+                var timeRef = data.content.strikes[data.content.strikes.length-1].time;
+                event['strikes'] = [];
+                for (let i=0; i < data.content.strikes.length; i++) {
+                    let strikeID = deviceID+"_"+eventNum+"-"+i;
+                        event['strikes'].push(new google.maps.Marker({
+                        position: { lat: data.content.strikes[i].latitude, lng: data.content.strikes[i].longitude },
+                        map: map,
+                        icon: getTimeImage(data.content.strikes[i].time, timeRef),
+                        title: new Date(data.content.strikes[i].time*1000).toLocaleString()
+                    }));
+                }
+                toggleEventHistoryStrikes(input);
+            }
+            icLoad.classList.remove('spin');
+        });
+    }
+
+    function showEventHistoryStrikes(input)  {
+        let ref = input.id.split("_");
+        let deviceID = ref[1];
+        let eventNum =  ref[2];
+        let event = historyEvents[deviceID][eventNum];
+        if (event['strikes'] == undefined) {
+            getHistoryStrikes(input);
+        } else {
+            toggleEventHistoryStrikes(input)
+        };
+    }
+
+    function showtLastAlertEvents(input)  {
+        let deviceID = input.id.split("_")[1];
+        nbAlert = document.getElementById('eventNum_'+deviceID).value;
+        getLastAlertEvents(deviceID, nbAlert);
     }
 
     function vigichanged(self) {
@@ -69,18 +313,124 @@
         console.log(self);
     }
 
+    function setAlertMsg(content) {
+      //  "device_id": self.device_id,  "device_name": self.device_name,
+      //  "AlertLevel": self._alertLevel, "Direction": direction, "Status": status, "Msg": Msg
+        vigiWidgets[content.device_id].handleAlert(content.alert.AlertLevel);
+        let alertInfo = document.getElementById('alertinfo_'+content.device_id);
+        alertInfo.innerHTML = content.alert.Msg;
+        let alert = "success";
+        switch (content.alert.AlertLevel) {
+            case 1 :
+                alert = "info";
+                break;
+            case 2 :
+                alert = "warning";
+                break;
+            case 3 :
+                alert = "danger";
+                break;
+        }
+        alertInfo.classList.value = 'alert alert-'+alert;
+    }
+
+    function setWsStatus(status) {
+        if (status.Connected) {
+            $("#wsstatus").removeClass().addClass("signal").attr("title", status.Msg);
+        } else {
+            $("#wsstatus").removeClass().addClass("glyphicon glyphicon-pause fa-3x").attr("title", status.Msg);
+        }
+        let color = 'error';
+        if (status.Error == "")  {
+            switch (status.State) {
+             case "Calm monitoring" :
+                color = 'calm';
+                break;
+             case "CheckTimes monitoring" :
+                color = 'checktimes';
+                break;
+             case "Wait next monitoring" :
+                color = 'waitnext';
+                break;
+             case "Lightning monitoring" :
+                color = 'lightning';
+                break;
+            }
+        } else {
+            new PNotify({
+                type: 'error',
+                title: '{% trans %}Source connection{% endtrans %}.',
+                text: status.Error,
+                delay: 6000
+            });
+        }
+        $("#wsstatus").addClass(color);
+    }
+
     $( document ).ready( function () {
-        // polylines colors : see https://www.w3schools.com/colors/colors_names.asp
-        colors = ['#5F9EA0',
-                  '#8A2BE2',
-                  '#DC143C'];
+        var ws_onmessage_vigilightning = ws.onmessage;
+        ws.onmessage = function(e) {
+            ws_onmessage_vigilightning(e);
+            var data = JSON.parse(e.data);
+            var msgId = data.msgid.split(".");
+            if (msgId[0] == "vigilightning") {
+                console.log(msgId, data);
+                switch (msgId[1]) {
+                    case 'device' :
+                        switch (msgId[2]) {
+                            case 'alertstatus' :
+                                setAlertMsg(data.content);
+                                break;
+                            case 'newstrike' :
+                                vigiWidgets[data.content.device_id].addStrike(data.content);
+                                break;
+                        }
+                        break;
+                    case 'manager' :
+                        switch (msgId[2]) {
+                            case 'history' :
+                                var timeRef = data.content.strikes[data.content.strikes.length-1].time;
+                                for (i = 0; i < data.content.strikes.length; i++) {
+                                    new google.maps.Marker({
+                                      position: { lat: data.content.strikes[i].latitude, lng: data.content.strikes[i].longitude },
+                                      map: map,
+                                      icon: getTimeImage(data.content.strikes[i].time, timeRef),
+                                      title: new Date(data.content.strikes[i].time*1000).toLocaleString()
+                                    });
+                                }
+                                break;
+                        }
+                        break;
+                    case 'plugin' :
+                        switch (msgId[2]) {
+                            case 'getwsstatus' :
+                                setWsStatus(data.content);
+                                break;
+                        }
+                        break;
+                }
+            }
+        }
         // Init the map
 
-        var map = new google.maps.Map(document.getElementById('map-canvas'), {
+        map = new google.maps.Map(document.getElementById('map-canvas'), {
             mapTypeId: 'terrain',
             center: {lat: 0, lng: 0},
             scrollwheel: true,
             zoom: 10
+        });
+        //********* get source connexion status
+        sendRequest("vigilightning.plugin.getwsstatus", {}, function(data, result) {
+            if (data.result == "error") {
+                new PNotify({
+                    type: 'error',
+                    title: '{% trans %}Fail to get source connection status{% endtrans %}.',
+                    text: data.content.error,
+                    delay: 6000
+                });
+            } else {
+                setWsStatus(data.content);
+            }
         });
         //********* Place devices location
         {% for data in locationsList %}
@@ -89,37 +439,55 @@
                 map.setCenter(latLng);
                 //****** Add circles for radius
                 vigiWidgets['{{ data.id }}'] = new LocalWidget(map, {{ data|tojson|safe }}, vigichanged);
-
+                historyEvents['{{ data.id }}'] = {}
                 //********* Add Strikes
+
                 {% for strike in data.strikes %}
-                      new google.maps.Marker({
-                          position: {lat: {{ strike.latitude }}, lng: {{ strike.longitude }}},
-                          map: map,
-                          icon: '/plugin_vigilightning/static/images/' + getTimeImage({{ strike.time }}) +'.png',
-                          title: new Date({{ strike.time }}*1000).toLocaleString()
-                        });
+                      vigiWidgets['{{ data.id }}'].addStrike({{ strike|tojson|safe }});
                 {% endfor %}
 
                 {% if data.isHome == True %}
                     map.panTo(new google.maps.LatLng({{ data.latitude }}, {{ data.longitude }}));
                 {% endif %}
             {% endif %}
+            let nbAlert = document.getElementById('eventNum_'+{{ data.id }}).value;
+            getLastAlertEvents({{ data.id }}, nbAlert);
+            sendRequest("vigilightning.manager.getalertstatus", {"device_id": {{ data.id }}}, function(data, result) {
+                if (data.result == "error") {
+                    new PNotify({
+                        type: 'error',
+                        title: '{% trans %}Fail to get alert status{% endtrans %}.',
+                        text: data.content.error,
+                        delay: 6000
+                    });
+                } else {
+                    new PNotify({
+                        type: 'success',
+                        title: '{% trans %}Alert status loaded{% endtrans %}.',
+                        text: "",
+                        delay: 4000
+                    });
+                    setAlertMsg(data.content);
+                }
+            });
+
         {% endfor %}
     })
+
     $("[id^='saveparams_']").click(function() {
         var deviceID = this.id.split("_")[1];
         $("#icsaveparams_" + deviceID).removeClass("glyphicon-floppy-save").addClass("glyphicon-hourglass");
         sendRequest("vigilightning.manager.setdeviceparams", {"device_id": deviceID,
-                                                                    "latitude": vigiWidgets[deviceID].position.lat(),
-                                                                    "longitude": vigiWidgets[deviceID].position.lng(),
-                                                                    "approachradius": vigiWidgets[deviceID].approachCircle.distance,
-                                                                    "nearbyradius": vigiWidgets[deviceID].nearbyCircle.distance,
-                                                                    "criticalradius": vigiWidgets[deviceID].criticalCircle.distance}, function(data, result) {
+                                                            "latitude": vigiWidgets[deviceID].position.lat(),
+                                                            "longitude": vigiWidgets[deviceID].position.lng(),
+                                                            "approachradius": vigiWidgets[deviceID].approachCircle.distance,
+                                                            "nearbyradius": vigiWidgets[deviceID].nearbyCircle.distance,
+                                                            "criticalradius": vigiWidgets[deviceID].criticalCircle.distance}, function(data, result) {
             $("#icsaveparams_" + deviceID).removeClass("glyphicon-hourglass").addClass("glyphicon-floppy-save");
             if (data.result == "error") {
                 new PNotify({
                     type: 'error',
-                    title: 'Fail to save device global parameters.',
+                    title: '{% trans %}Fail to save device global parameters{% endtrans %}.',
                     text: data.content.error,
                     delay: 6000
                 });
@@ -127,7 +495,7 @@
                 $("#saveparams_" + deviceID).addClass("hidden");
                 new PNotify({
                     type: 'success',
-                    title: 'Device global parameters saved',
+                    title: '{% trans %}Device global parameters saved{% endtrans %}.',
                     text: "",
                     delay: 4000
                 });

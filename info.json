@@ -10,7 +10,7 @@
                 "type": "python"
             }],
         "description": "Domogik Plugin for lightning vigilance (blitzortung.org)",
-        "domogik_min_version": "0.5.2",
+        "domogik_min_version": "0.6.0",
         "name": "vigilightning",
         "type": "plugin",
         "version": "0.1"
@@ -25,7 +25,7 @@
             "type": "string"
         },{
             "default": 30,
-            "description": "lightning activity check times (minutes) in calm weather.",
+            "description": "Base check time for lightning activity (minutes). - Value is pause time of source monitoring in calm weather. - Half value is source monitoring time in calm weather. - Value x1.5  is source monitoring time from the last lightning strike event.",
             "key": "checktimes",
             "name": "Check times",
             "required": "yes",
@@ -48,17 +48,17 @@
                 {
                     "key": "latitude",
                     "xpl": false,
-                    "description": "Latitude point to survey.",
+                    "description": "Latitude point to monitor. (radians)",
                     "type": "float"
                 },{
                     "key": "longitude",
                     "xpl": false,
-                    "description": "Longitude point to survey. (radians)",
+                    "description": "Longitude point to monitor. (radians)",
                     "type": "float"
                 },{
                     "key": "criticalradius",
                     "xpl": false,
-                    "description": "Radius (km) from the monitoring point to raise a critical alert",
+                    "description": "Radius (km) from the monitoring point to raise a critical alert.",
                     "type": "float",
                     "default": 1
                 },{
@@ -72,7 +72,7 @@
                     "xpl": false,
                     "description": "Radius (km) from the monitoring point to raise a approach alert.",
                     "type": "float",
-                    "default": 5
+                    "default": 9
                 },{
                     "key": "releasetimes",
                     "xpl": false,
