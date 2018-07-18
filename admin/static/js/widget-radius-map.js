@@ -6,6 +6,8 @@
 * @param {data of widget} data The widget param to attach the localisation widget.
 */
 
+var IconOffset = {x: 12,y: 32};
+
 function getTimeImage(time, reftime) {
     const  prefix = (reftime == undefined) ? 'cur-strike-t' : 'his-strike-t'
     let current = (reftime == undefined) ? Math.floor(Date.now() / 1000) : reftime;
@@ -53,7 +55,7 @@ function getTimeImage(time, reftime) {
                   strokeWeight: 1,
                   fillColor: '#0000FF',
                   fillOpacity: 0.15,
-                  map: map,
+                  map: this.map,
                   center: {lat: data.latitude, lng: data.longitude},
                   radius: data.approachradius
                 });
@@ -64,7 +66,7 @@ function getTimeImage(time, reftime) {
                   strokeWeight: 1,
                   fillColor: '#FF8000',
                   fillOpacity: 0.15,
-                  map: map,
+                  map: this.map,
                   center: {lat: data.latitude, lng: data.longitude},
                   radius: data.nearbyradius
                 });
@@ -75,7 +77,7 @@ function getTimeImage(time, reftime) {
                   strokeWeight: 1,
                   fillColor: '#DF0101',
                   fillOpacity: 0.15,
-                  map: map,
+                  map: this.map,
                   center: {lat: data.latitude, lng: data.longitude},
                   radius: data.criticalradius
                 });
@@ -87,7 +89,7 @@ function getTimeImage(time, reftime) {
 
         var marker = new google.maps.Marker({
           position: {lat: data.latitude, lng: data.longitude},
-          map: map,
+          map: this.map,
           title: data.name,
           draggable:true
         });
@@ -107,7 +109,7 @@ function getTimeImage(time, reftime) {
                 '</ul>'+
                 '</div>'+
                 '</div>');
-            infowindow.open(map, marker);
+            infowindow.open(self.map, marker);
         });
 
         // Bind the marker map property to the LocalWidget map property
@@ -129,7 +131,14 @@ function getTimeImage(time, reftime) {
         google.maps.event.addListener(this, 'position_changed', function () {
           updateParams(this);
         });
-
+        // Show the lat and lng under the mouse cursor.
+        var coordsDiv = document.getElementById('coords_'+this.device_id);
+        map.controls[google.maps.ControlPosition.TOP_CENTER].push(coordsDiv);
+        map.addListener('mousemove', function(event) {
+            coordsDiv.textContent =
+                'lat: ' + event.latLng.lat().toFixed(4)+ ', ' +
+                'lng: ' + event.latLng.lng().toFixed(4);
+            });
     }
     LocalWidget.prototype = new google.maps.MVCObject();
 
@@ -156,8 +165,10 @@ function getTimeImage(time, reftime) {
               position: {lat: strike.latitude, lng: strike.longitude},
               map: this.map,
               icon: {url: getTimeImage(strike.time),
-                       origin: new google.maps.Point(16, 32)},
-              title: new Date(strike.time*1000).toLocaleString(),
+                     anchor: IconOffset},
+              title: new Date(strike.time*1000).toLocaleString() + "\n" +
+                    'lat: ' + strike.latitude.toFixed(4) + '\n' +
+                    'lng: ' + strike.longitude.toFixed(4),
               time : strike.time
         });
         this.timerStrikes[strikeID] = setInterval(function(strikeID, self) {
@@ -188,7 +199,8 @@ function getTimeImage(time, reftime) {
     }
     LocalWidget.prototype.refreshStrikes = function () {
         for (s in this.strikes) {
-            this.strikes[s].setIcon(getTimeImage(this.strikes[s].time));
+            this.strikes[s].setIcon({url: getTimeImage(this.strikes[s].time),
+                                     anchor: IconOffset});
         }
     }
 
@@ -351,7 +363,7 @@ function getTimeImage(time, reftime) {
     };
 
     function updateParams(widget, circle) {
-        var info = document.getElementById('info');
+        var info = document.getElementById('info_'+widget.device_id);
         let dist = ', distances: ' + widget.criticalCircle.distance.toFixed(3) + ' / ' +
                     + widget.nearbyCircle.distance.toFixed(3) +' / ' + widget.approachCircle.distance.toFixed(3) +' km';
         if (circle != undefined) {
