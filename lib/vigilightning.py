@@ -261,7 +261,7 @@ class VigiLocation:
             if alertLevel <> 0 :
                 self.manager.setLastStrikeAlert({"time": strikeTime, "device_id": self.device_id, 'alertLevel': alertLevel})
                 self._strikes.append({"time": strikeTime, 'latitude':  lat, 'longitude':  lon, 'alertLevel': alertLevel, 'direction': direction})
-                toSend = {'CriticalStrike': "{0},{1}".format(lat, lon), "atTimestamp": strikeTime}
+                toSend = {'Strike': "{0},{1}".format(lat, lon), "atTimestamp": strikeTime}
                 self._send(self.device_id, self.device_name, toSend)
                 self.manager.publishMsg("vigilightning.device.newstrike", {"device_id": self.device_id,  "device_name": self.device_name,
                                                  "time": strikeTime, 'latitude':  lat, 'longitude':  lon, 'alertLevel': alertLevel, 'direction': direction})
@@ -342,7 +342,7 @@ class VigiLocation:
             if res is not None :
                 resData = res.get_data()
                 print(u"getLastAlertLevel : {0}".format(resData))
-                if resData['values'] :
+                if resData['values'] and resData['values'][0]['value_num'] is not None :
                     level = int(resData['values'][0]['value_num'])
         return level
 
@@ -387,7 +387,7 @@ class VigiLocation:
 
     def getEventHistoryStrike(self, eventAlert):
         """ Return strike history"""
-        sensor_id = self.manager.getSensorId(self.device_id, 'CriticalStrike')
+        sensor_id = self.manager.getSensorId(self.device_id, 'Strike')
         self.log.debug(u"{0} Get history strike(s): {1}".format(self.device_name, eventAlert))
         strikesList = []
         if sensor_id :

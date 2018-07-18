@@ -189,7 +189,8 @@ class VigiLightningManager(Plugin):
                         if data['device_id'] in self.vigi_List :
                             if action[2] == 'getalertstatus' :
                                 report = self.vigi_List[data['device_id']].getAlertStatus()
-                                reply_msg.add_data('alert', report)
+                                for k, item in report.items():
+                                    reply_msg.add_data(k, item)
                             if action[2] == 'getstrikes' :
                                 report = self.vigi_List[data['device_id']].getStrikes()
                                 reply_msg.add_data('strikes', report)
@@ -305,8 +306,8 @@ class VigiLightningManager(Plugin):
                                 self._startCheck = 0
                                 self.createWSClient()
                                 self._startCheck = currentTime
-                        if msg != "" :
-                            self.publishMsg("vigilightning.plugin.getwsstatus", self.getWSStatus(msg))
+                    if msg != "" :
+                        self.publishMsg("vigilightning.plugin.getwsstatus", self.getWSStatus(msg))
                 except :
                     self.log.error(u"Check lightning {0} error: {1}".format(self.vigiSource, (traceback.format_exc())))
                     self._connexionError = u"Fail to connect"
