@@ -2,7 +2,7 @@
 
 if [ "$1" != "" ]
 then
-    ERROR=$(egrep 'WARNING|ERROR' "$1" |sort -rnk1,2 | head -10)
+    ERROR=$(egrep -A 10 'WARNING|ERROR' "$1")
     if [ -z "$ERROR" ]
     then
         echo -e "No error or warning"
