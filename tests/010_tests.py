@@ -6,7 +6,7 @@ from domogikmq.reqrep.client import MQSyncReq
 from domogikmq.message import MQMessage
 
 from domogik.xpl.common.plugin import Plugin
-from domogik.tests.common.helpers import Printc
+#from domogik.tests.common.helpers import Printc
 from domogik.tests.common.plugintestcase import PluginTestCase
 from domogik.tests.common.testplugin import TestPlugin
 from domogik.tests.common.testdevice import TestDevice
@@ -40,35 +40,22 @@ class VigilightningTestCase(PluginTestCase):
         self.testDevices = []
 
         # do the test
-        Printc.infob(u"Check that a websocket is connected to data server.")
+#        Printc.infob(u"Check that a websocket is connected to data server.")
+        print(u"Check that a websocket is connected to data server.")
         action, resData = get_request(client_id, "vigilightning.plugin.getwsstatus", {})
-        data = {"rfp_status" : 1}
-        self.assertTrue(self.wait_for_mq(device_id = device_id,
-                                          data = data,
-                                          timeout = timer_status * 2))
+        self.assertEqual(resData['Error'], "")
+        self.assertTrue(resData['Connected'])
+        self.assertNotEqual(resData['State'], "")
         time.sleep(1)
-        Printc.infob(u"Check that the values of the MQ message has been inserted in database")
-        sensor = TestSensor(device_id, "rfp_status")
-        self.assertTrue(sensor.get_last_value()[1] == str(data['rfp_status']))
 
     def test_0110_device_sensors(self):
         """ Test if the RFPlayer sensor infoType 4 5 6 7 9 is sent when a frame is received
         """
-        for device in self.sensorsTest:
-            Printc.infob(u"Check that a MQ message for all the sensors of device <{0}> id <{1}> are sent.".format(device['name'], device['device_id']))
-            data = {}
-            for value in device['values'] :
-            # do the test
-                Printc.infob(u"Check that a MQ message for the sensor <{0}> frame received is sent.".format(value["sensor"]))
-                data[value["sensor"]] = value["value"]
-            self.assertTrue(self.wait_for_mq(device_id = device['device_id'],
-                                              data = data,
-                                              timeout = device['timeout']))
-            time.sleep(1)
-            for value in device['values'] :
-                Printc.infob(u"Check that the values of the MQ message for the sensor <{0}> has been inserted in database".format(value["sensor"]))
-                sensor = TestSensor(device['device_id'], value["sensor"])
-                self.assertTrue(sensor.get_last_value()[1] == str(value["value"]))
+#        Printc.infob(u"Check that the values of the MQ message has been inserted in database")
+        data = {"LocationPoint" : "46.739868,2.328084"}
+        print(u"Check that the values of the MQ message has been inserted in database")
+        sensor = TestSensor(device_id, "LocationPoint")
+        self.assertTrue(sensor.get_last_value()[1] == str(data['LocationPoint']))
 
 def createDevice(dataJson):
     td = TestDevice()
@@ -92,7 +79,8 @@ def createDevice(dataJson):
         # create
         return td.create_device(params)['id'], td
     except:
-        Printc.err(u"Error while creating the test devices {0} : {1}".format(device, traceback.format_exc()))
+#        Printc.err(u"Error while creating the test devices {0} : {1}".format(device, traceback.format_exc()))
+        print(u"Error while creating the test devices {0} : {1}".format(device, traceback.format_exc()))
         return False, td
 
 
@@ -145,17 +133,18 @@ if __name__ == "__main__":
     try:
         td.del_devices_by_client(client_id)
     except:
-        Printc.err(u"Error while deleting all the test device for the client id '{0}' : {1}".format(client_id, traceback.format_exc()))
+#        Printc.err(u"Error while deleting all the test device for the client id '{0}' : {1}".format(client_id, traceback.format_exc()))
+        print(u"Error while deleting all the test device for the client id '{0}' : {1}".format(client_id, traceback.format_exc()))
         sys.exit(1)
 
     # create a test device
     try:
         #device_id = td.create_device(client_id, "test_device_RFPlayer", "RFPlayer.electric_meter")
 
-        params = td.get_params(client_id, "vigilightning.vigilocation")
+        params = td.get_params(client_id, "vigilocation")
 
         # fill in the params
-        params["device_type"] = "vigilightning.vigilocation"
+        params["device_type"] = "vigilocation"
         params["name"] = "test_vigilocation"
         params["reference"] = "reference"
         params["description"] = "description"
@@ -180,7 +169,8 @@ if __name__ == "__main__":
         device_id = td.create_device(params)['id']
 
     except:
-        Printc.err(u"Error while creating the test devices : {0}".format(traceback.format_exc()))
+#        Printc.err(u"Error while creating the test devices : {0}".format(traceback.format_exc()))
+        print(u"Error while creating the test devices : {0}".format(traceback.format_exc()))
         sys.exit(1)
 
     ### prepare and run the test suite
@@ -196,20 +186,22 @@ if __name__ == "__main__":
     suite.addTest(VigilightningTestCase("test_0100_wsconnection", plugin, name, cfg))
 
     # do the specific device tests
-    jsonFile = "x10_protocol_result.json"
-    try:
-        json_fp = open("{0}/{1}".format(test_folder, jsonFile))
-        dataJson = json.load(json_fp)
-        Printc.infob(u"Data for specific tests are loaded from {0}".format(jsonFile))
-        json_fp.close()
-    except:
-        Printc.err(u"Error while loading json tests {0} : {1}".format("{0}/{1}".format(test_folder, jsonFile), traceback.format_exc()))
-    else :
-        for device in dataJson :
-            dev_id, td = createDevice(device)
-            device['device_id'] = dev_id
-            time.sleep(5) # due to high DB flow, wait 5s
-        suite.addTest(VigilightningTestCase("test_0110_device_sensors", plugin, name, cfg, dataJson))
+#    jsonFile = "x10_protocol_result.json"
+#    try:
+#        json_fp = open("{0}/{1}".format(test_folder, jsonFile))
+#        dataJson = json.load(json_fp)
+#        Printc.infob(u"Data for specific tests are loaded from {0}".format(jsonFile))
+#        json_fp.close()
+#    except:
+#        Printc.err(u"Error while loading json tests {0} : {1}".format("{0}/{1}".format(test_folder, jsonFile), traceback.format_exc()))
+#    else :
+#        for device in dataJson :
+#            dev_id, td = createDevice(device)
+#            device['device_id'] = dev_id
+#            time.sleep(5) # due to high DB flow, wait 5s
+#        suite.addTest(VigilightningTestCase("test_0110_device_sensors", plugin, name, cfg, dataJson))
+
+    suite.addTest(VigilightningTestCase("test_0110_device_sensors", plugin, name, cfg))
 
 # do some tests comon to all the plugins
     #suite.addTest(VigilightningTestCase("test_9900_hbeat", plugin, name, cfg))
