@@ -23,12 +23,20 @@ before_script:
   - ~/domogik/src/domogik/tests/travis/travis-install-domogik-mq.sh
   - ~/domogik/src/domogik/tests/travis/travis-install-domogik.sh
   - ~/domogik/src/domogik/tests/travis/travis-install-plugin.sh
+- echo "==== Install plugin dependency"
+  - pip install pyserial
   - sudo ~/domogik/src/domogik/tests/travis/travis-start-domogik.sh
 script:
   - cd $TRAVIS_BUILD_DIR
   - dmg_testrunner -a /var/lib/domogik/domogik_packages/plugin_$DMG_PLUGIN/tests/
 after_script:
   - ~/domogik/src/domogik/tests/travis/travis-after.sh
+  - ls -l /var/log/domogik
+  - echo "********** search ERROR in log *******************"
+  - cat -A /var/log/domogik/* | grep -A 10 ERROR
+  - echo "********** vigilightning plugin_test.log *******************"
+  - cat /var/log/domogik/plugin_test.log
+
 notifications:
   irc: "irc.freenode.net#domogik"
   on_success: never
