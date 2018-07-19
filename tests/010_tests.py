@@ -49,7 +49,7 @@ class VigilightningTestCase(PluginTestCase):
         time.sleep(1)
 
     def test_0110_device_sensors(self):
-        """ Test if the RFPlayer sensor infoType 4 5 6 7 9 is sent when a frame is received
+        """ Test if the LocationPoint sensor is sent when plugin is started
         """
 #        Printc.infob(u"Check that the values of the MQ message has been inserted in database")
         data = {"LocationPoint" : "46.739868,2.328084"}
@@ -104,7 +104,7 @@ if __name__ == "__main__":
 
     ### global variables
     wssource = "ws.blitzortung.org"
-    checktimes = 3
+    checktimes = "3"
 
     # set up the features
     plugin = Plugin(name = 'test',

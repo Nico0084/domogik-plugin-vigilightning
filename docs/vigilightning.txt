@@ -98,7 +98,7 @@ releasetimes          float (default 20 mn)       Release times (minutes) after 
 
 .. note::
 
-    You can adjust GPS coordinate and radius in any point, and after created device go to admin UI advanced page to set them with precision in google map.
+    You can adjust GPS coordinate and radius in any point, after created device go to admin UI advanced page to set them with precision in google map.
 
 Strike detection description
 ****************************
@@ -126,7 +126,3 @@ Start the plugin
 
 You can now start the plugin (start button) and use the created devices.
 
-Set up your widgets on the user interface
-=========================================
-
-You can now place the widgets of your devices features on the user interface.
