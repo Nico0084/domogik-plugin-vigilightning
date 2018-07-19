@@ -251,7 +251,7 @@ class VigiLightningManager(Plugin):
 
     def handle_connexion(self):
         """ Handle time to reconnect websocket
-            During calm weather connection is stopped and restart every self.checkTimes during 10 minutes.
+            During calm (no lightning) connection is stopped and restart every self.checkTimes during 10 minutes.
             If no event detected next to location websocket is closed.
         """
         self.run = True

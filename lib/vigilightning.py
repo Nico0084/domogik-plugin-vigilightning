@@ -234,7 +234,7 @@ class VigiLocation:
 
     def getAlertMsg(self):
         if self._status == "calm" :
-            msg = u"Calm Weather."
+            msg = u"No lightning."
         elif self._status == "end" :
             msg = u"End of lightning alert."
         elif self._status == "roll away" :
