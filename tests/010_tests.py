@@ -108,9 +108,10 @@ if __name__ == "__main__":
 
     # set up the features
     plugin = Plugin(name = 'test',
-                           daemonize = False,
-                           parser = None,
-                           test  = True)
+                   daemonize = False,
+                   parser = None,
+                   test  = True,
+                   myxpl = None) # fix for non xpl plugin
 
     # set up the plugin name
     name = "vigilightning"
