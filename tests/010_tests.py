@@ -110,8 +110,9 @@ if __name__ == "__main__":
     plugin = Plugin(name = 'test',
                    daemonize = False,
                    parser = None,
-                   test  = True,
-                   myxpl = None) # fix for non xpl plugin
+                   test  = True)
+
+    Plugin.myxpl = None # fix for non xpl plugin at PluginTestCase__init__
 
     # set up the plugin name
     name = "vigilightning"

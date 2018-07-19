@@ -52,7 +52,7 @@ In Domogik administration section, go to client plugin-vigilithning details page
 +----------------+--------------------+--------------------------------------------------------------------------------------+
 | checktimes     | 30                 | Base check time for lightning activity (minutes).                                    |
 |                |                    |                                                                                      |
-|                |                    | - Value is pause time of source monitoring in calm weather.                          |
+|                |                    | - Value is pause time of source monitoring in calm weather (no lightning).           |
 |                |                    | - Half value is source monitoring time in calm weather.                              |
 |                |                    | - Value x1.5  is source monitoring time from the last lightning strike event.        |
 +----------------+--------------------+--------------------------------------------------------------------------------------+
@@ -105,10 +105,10 @@ Strike detection description
 
 There are four alert level :
 
-- 0 => calm weather, no strike detected in all monitored circle.
+- 0 => calm mode, no strike detected in all monitored circle.
 - 1 => More than 2 strikes are detected in approach circle during the last releasetimes.
-- 2 => more than 1 strike is detected in nearbyradius circle during the last releasetimes.
-- 3 => more than 1 strike is detected in criticalradius circle during the last releasetimes.
+- 2 => At least 1 strike is detected in nearbyradius circle during the last releasetimes.
+- 3 => At least 1 strike is detected in criticalradius circle during the last releasetimes.
 
 
 The level alert decrease level by level in release time. But if strikes stop rapidly level could go to 0 in one step.
