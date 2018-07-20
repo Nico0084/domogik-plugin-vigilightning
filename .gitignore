@@ -1,6 +1,6 @@
 *.pyc
 *.swp
-_build_doc
+docs/_build
 *~
 *.20*
 *.directory

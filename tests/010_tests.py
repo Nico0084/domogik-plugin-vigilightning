@@ -51,6 +51,8 @@ class VigilightningTestCase(PluginTestCase):
     def test_0110_device_sensors(self):
         """ Test if the LocationPoint sensor is sent when plugin is started
         """
+        global device_id
+
 #        Printc.infob(u"Check that the values of the MQ message has been inserted in database")
         data = {"LocationPoint" : "46.739868,2.328084"}
         print(u"Check that the values of the MQ message has been inserted in database")
