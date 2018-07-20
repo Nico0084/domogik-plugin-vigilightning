@@ -59,7 +59,7 @@ class VigilightningTestCase(PluginTestCase):
         sensor = TestSensor("{0}".format(device_id), "LocationPoint")
 #        just to fix issue on get sensor id
         sensor.sensor_id = 1
-        print(u"Sensor selected : {0} / {1}}, ".format(sensor.sensor_id, sensor.sensor_reference))
+        print(u"Sensor selected : {0} / {1}, ".format(sensor.sensor_id, sensor.sensor_reference))
         self.assertTrue(sensor.get_last_value()[1] == str(data['LocationPoint']))
 
 def createDevice(dataJson):
