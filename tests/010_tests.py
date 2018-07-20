@@ -57,7 +57,7 @@ class VigilightningTestCase(PluginTestCase):
         data = {"LocationPoint" : "46.739868,2.328084"}
         print(u"Check that the values of the MQ message has been inserted in database")
         sensor = TestSensor("{0}".format(device_id), "LocationPoint")
-        print(u"Sensor selected : {0} / {1} / {2}, ".format(sensor.sensor_id, sensor.sensor_reference, sensor, name))
+        print(u"Sensor selected : {0} / {1} / {2}, ".format(sensor.sensor_id, sensor.sensor_reference, sensor.name))
         self.assertTrue(sensor.get_last_value()[1] == str(data['LocationPoint']))
 
 def createDevice(dataJson):

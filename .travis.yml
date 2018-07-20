@@ -14,7 +14,8 @@ env:
   DMG_PLUGIN=vigilightning
 install:
   - cd ~
-  - git clone https://github.com/domogik/domogik.git
+#  - git clone https://github.com/domogik/domogik.git
+  - git clone https://github.com/Nico0084/domogik.git
   - cd domogik
   - git checkout $DMG_BRANCH
   - ~/domogik/src/domogik/tests/travis/travis-install-dependencies.sh
