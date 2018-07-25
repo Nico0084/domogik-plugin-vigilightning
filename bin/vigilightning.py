@@ -333,7 +333,7 @@ class VigiLightningManager(Plugin):
         except :
             self.webSockect = None
             self.log.warning("WSClient to <{0}>, Create error : {1}".format(url, traceback.format_exc()))
-            self._connexionError(u"Fail to connect")
+            self._connexionError = u"Fail to connect"
 
     def receivedData(self, data):
         if set(("time", "lat", "lon", "alt", "pol", "mds", "mcg", "sig", "delay",)) <= set(data):
@@ -343,7 +343,7 @@ class VigiLightningManager(Plugin):
                 self.vigi_List[id].receiveStrike(data)
         else :
             self.log.warning(u"Receive unknown data : {0}".format(data))
-            self._connexionError(u"Receive unknown data : {0}".format(data))
+            self._connexionError = u"Receive unknown data : {0}".format(data)
 
     def getWSStatus(self, msg=None):
         if msg is not None : self._msg = msg
