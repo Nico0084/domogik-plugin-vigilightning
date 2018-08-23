@@ -2,7 +2,13 @@
 Changelog
 =========
 
+0.2 (23-08-2018)
+------------------
+
+* Change set alert level 1 at the 2nd strike (4th before) in aera
+* Add AlertStatus sensor in domogik device, store only last status. DT_Step type : 0 -> alert Decrease, 1 -> alert, Increase. To use in scenario for exemple. Please recreate your device.
+
 0.1
-===
+---
 
 * Plugin creation

@@ -188,7 +188,7 @@ class VigiLocation:
                                 self.setAlertLevel(0, direction)
                             else :
                                 # Check if lightning is in approach
-                                if nbStrike >= 4 : # filter isolate strike
+                                if nbStrike >= 2 : # filter isolate strike
                                     self.setAlertLevel(1, direction)
                         else :
                             if self._status != 'calm' :
@@ -207,6 +207,7 @@ class VigiLocation:
     def setAlertLevel(self, level, direction):
         if level != self._alertLevel:
             if level < self._alertLevel :
+                step = 0
                 if level == 0 :
                     self._status = "end"
                     self._strikes[:] = []
@@ -215,6 +216,7 @@ class VigiLocation:
                 elif level == 2 :
                     self._status = "calms down"
             else :
+                step = 1
                 if level == 1 :
                     self._status = "in approach"
                 elif level == 2 :
@@ -223,6 +225,7 @@ class VigiLocation:
                     self._status = "critical"
             self._alertLevel = level
             self._direction = direction
+            self._send(self.device_id, self.device_name, {'AlertStatus': step})
             self._send(self.device_id, self.device_name, {'AlertLevel': self._alertLevel})
             self.manager.publishMsg("vigilightning.device.alertstatus", {"device_id": self.device_id,  "device_name": self.device_name,
                                              "AlertLevel": self._alertLevel, "Direction": direction, "Status": self._status, "Msg": self.getAlertMsg()})

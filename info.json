@@ -13,7 +13,7 @@
         "domogik_min_version": "0.6.0",
         "name": "vigilightning",
         "type": "plugin",
-        "version": "0.1"
+        "version": "0.2"
     },
 
     "configuration": [{
@@ -42,6 +42,7 @@
             "sensors": [
                         "LocationPoint",
                         "Strike",
+                        "AlertStatus",
                         "AlertLevel"
                         ],
             "parameters": [
@@ -121,6 +122,20 @@
             "timeout": 0,
             "history": {
                 "store": true,
+                "duplicate": true,
+                "max": 0,
+                "expire": 0,
+                "round_value": 0
+            }
+        },
+        "AlertStatus": {
+            "name": "Last type of alert decrease (0) or increase (1)",
+            "data_type": "DT_Step",
+            "conversion": "",
+            "incremental": false,
+            "timeout": 0,
+            "history": {
+                "store": false,
                 "duplicate": true,
                 "max": 0,
                 "expire": 0,
