@@ -3,8 +3,11 @@
 
 {% block content %}
 {% include theme("client_menu.html") %}
+ <link rel="stylesheet" href="/plugin_vigilightning/static/leaflet/leaflet.css"/>
 
 <style>
+
+
 .spin {
     -webkit-animation: spin .8s infinite linear;
     -moz-animation: spin .8s infinite linear;
@@ -97,7 +100,9 @@
 
 </style>
 
-<script src="https://maps.googleapis.com/maps/api/js?libraries=places&key=AIzaSyD43wvlTg66qR_yPOQOgEG4zeSOMC_ubu4"></script>
+<script type="text/javascript" src="/plugin_vigilightning/static/leaflet/leaflet.js"></script>
+<script type="text/javascript" src="/plugin_vigilightning/static/js/Leaflet.Editable.js"></script>
+
 <script type="text/javascript" charset="utf8" src="/plugin_vigilightning/static/js/widget-radius-map.js"></script>
 
 <div class="container">
@@ -238,20 +243,23 @@
         let deviceID = ref[1];
         let eventNum =  ref[2];
         let event = historyEvents[deviceID][eventNum];
-        var dmap = map[deviceID];
+        var dMap = map[deviceID];
 
         if (input.classList.contains('btn-default')) {
             input.classList.remove('btn-default');
             input.classList.add('btn-primary');
-            dmap = map[deviceID];
         } else {
             input.classList.remove('btn-primary');
             input.classList.add('btn-default');
-            dmap = null;
+            dMap = null;
         }
         if (event.strikes != undefined) {
             for (i = 0; i < event.strikes.length; i++) {
-                event.strikes[i].setMap(dmap);
+                if (dMap) {
+                    event.strikes[i].addTo(dMap);
+                } else {
+                    event.strikes[i].remove();
+                }
             }
         }
     }
@@ -287,15 +295,17 @@
                     event['strikes'] = [];
                     for (let i=0; i < data.content.strikes.length; i++) {
                         let strikeID = deviceID+"_"+eventNum+"-"+i;
-                            event['strikes'].push(new google.maps.Marker({
-                            position: { lat: data.content.strikes[i].latitude, lng: data.content.strikes[i].longitude },
-                            map: map[deviceID],
-                            icon: {url: getTimeImage(data.content.strikes[i].time, timeRef),
-                                   anchor: {x: 8, y: 8}},
-                            title: new Date(data.content.strikes[i].time*1000).toLocaleString()+ "\n" +
-                                    'lat: ' + data.content.strikes[i].latitude.toFixed(4) + '\n' +
-                                    'lng: ' + data.content.strikes[i].longitude.toFixed(4),
-                        }));
+                        let strikeIcon = L.icon({
+                            iconUrl: getTimeImage(data.content.strikes[i].time, timeRef),
+                            iconSize:     [16, 16], // size of the icon
+                            iconAnchor:   [8, 8], // point of the icon which will correspond to marker's location
+                            popupAnchor:  [0, -10] // point from which the popup should open relative to the iconAnchor
+                        });
+
+                        event['strikes'].push(L.marker([data.content.strikes[i].latitude, data.content.strikes[i].longitude],
+                            {icon: strikeIcon}).bindPopup('<span>'+new Date(data.content.strikes[i].time*1000).toLocaleString()+ "<br>" +
+                                    'lat: ' + data.content.strikes[i].latitude.toFixed(4) + '<br>' +
+                                    'lng: ' + data.content.strikes[i].longitude.toFixed(4) + '</span>'));
                     }
                 } else {
                     new PNotify({
@@ -413,7 +423,7 @@
                                 if (data.content.strikes.length != 0) {
                                     var timeRef = data.content.strikes[data.content.strikes.length-1].time;
                                     for (i = 0; i < data.content.strikes.length; i++) {
-                                        new google.maps.Marker({
+                                        L.marker({
                                           position: { lat: data.content.strikes[i].latitude, lng: data.content.strikes[i].longitude },
                                           map: map[data.content.device_id],
                                           icon: getTimeImage(data.content.strikes[i].time, timeRef),
@@ -458,17 +468,26 @@
         {% for data in locationsList %}
             // Init the map
 
-            map[{{ data.id }}] = new google.maps.Map(document.getElementById('map-canvas_{{ data.id }}'), {
-                mapTypeId: 'terrain',
-                center: {lat: 0, lng: 0},
-                scrollwheel: true,
-                zoom: 10
-            });
+            map[{{ data.id }}] = L.map(document.getElementById('map-canvas_{{ data.id }}'), {editable: true}).setView([0, 0], 11);
+            // Init tiles source layer
+            L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map[{{ data.id }}]);
+
             {% if data.latitude != None and data.longitude != None %}
-                let latLng{{ data.id }} = new google.maps.LatLng({lat: {{ data.latitude }}, lng: {{ data.longitude }}});
-                map[{{ data.id }}].setCenter(latLng{{ data.id }});
+                let latLng{{ data.id }} = L.latLng({lat: {{ data.latitude }}, lng: {{ data.longitude }}});
+
+                map[{{ data.id }}].setView(latLng{{ data.id }});
                 //****** Add circles for radius
-                vigiWidgets['{{ data.id }}'] = new LocalWidget(map[{{ data.id }}], {{ data|tojson|safe }}, vigichanged);
+
+                vigiWidgets['{{ data.id }}'] = new LocalWidget(latLng{{ data.id }},
+                                                            {   callChanged: vigichanged,
+                                                                title: '{{ data.name }}',
+                                                                draggable:true
+                                                            },
+                                                            map[{{ data.id }}],
+                                                            {{ data|tojson|safe }});
+                vigiWidgets['{{ data.id }}'].addTo(map[{{ data.id }}]);
                 historyEvents['{{ data.id }}'] = {}
                 //********* Add Strikes
 
@@ -477,7 +496,7 @@
                 {% endfor %}
 
                 {% if data.isHome == True %}
-                    map[{{ data.id }}].panTo(new google.maps.LatLng({{ data.latitude }}, {{ data.longitude }}));
+                    map[{{ data.id }}].panTo(L.latLng({{ data.latitude }}, {{ data.longitude }}));
                 {% endif %}
             {% endif %}
             let nbAlert{{ data.id }} = document.getElementById('eventNum_'+{{ data.id }}).value;
@@ -500,7 +519,6 @@
                     setAlertMsg(data.content);
                 }
             });
-
         {% endfor %}
     })
 
@@ -508,11 +526,11 @@
         var deviceID = this.id.split("_")[1];
         $("#icsaveparams_" + deviceID).removeClass("glyphicon-floppy-save").addClass("glyphicon-hourglass");
         sendRequest("vigilightning.manager.setdeviceparams", {"device_id": deviceID,
-                                                            "latitude": vigiWidgets[deviceID].position.lat(),
-                                                            "longitude": vigiWidgets[deviceID].position.lng(),
-                                                            "approachradius": vigiWidgets[deviceID].approachCircle.distance,
-                                                            "nearbyradius": vigiWidgets[deviceID].nearbyCircle.distance,
-                                                            "criticalradius": vigiWidgets[deviceID].criticalCircle.distance}, function(data, result) {
+                                                            "latitude": vigiWidgets[deviceID].getLatLng().lat,
+                                                            "longitude": vigiWidgets[deviceID].getLatLng().lng,
+                                                            "approachradius": vigiWidgets[deviceID].approachCircle.getDistance(),
+                                                            "nearbyradius": vigiWidgets[deviceID].nearbyCircle.getDistance(),
+                                                            "criticalradius": vigiWidgets[deviceID].criticalCircle.getDistance()}, function(data, result) {
             $("#icsaveparams_" + deviceID).removeClass("glyphicon-hourglass").addClass("glyphicon-floppy-save");
             if (data.result == "error") {
                 new PNotify({
