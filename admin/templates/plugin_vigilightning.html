@@ -225,9 +225,9 @@
                             color = "red";
                             break;
                     }
+                    let dateEnd = (data.content.events[e].end == 0) ? "alert in progress" : new Date(data.content.events[e].end*1000).toLocaleString();
                     options +="<button type='button' class='btn btn-default' id='event_"+deviceID+"_"+e+"' onclick='showEventHistoryStrikes(this);'>"+
-                                new Date(data.content.events[e].begin*1000).toLocaleString()+" => "+
-                                new Date(data.content.events[e].end*1000).toLocaleString()+
+                                new Date(data.content.events[e].begin*1000).toLocaleString()+" => "+dateEnd+
                         " <span class='badge' id='bdgEvent_"+deviceID+"_"+e+"' style='background-color: "+color+";margin: 2px 0px 0px 5px;'>"+data.content.events[e].level+"</span>"+
                       "</button>";
                 }
@@ -477,7 +477,6 @@
             {% if data.latitude != None and data.longitude != None %}
                 let latLng{{ data.id }} = L.latLng({lat: {{ data.latitude }}, lng: {{ data.longitude }}});
 
-                map[{{ data.id }}].setView(latLng{{ data.id }});
                 //****** Add circles for radius
 
                 vigiWidgets['{{ data.id }}'] = new LocalWidget(latLng{{ data.id }},
@@ -488,6 +487,7 @@
                                                             map[{{ data.id }}],
                                                             {{ data|tojson|safe }});
                 vigiWidgets['{{ data.id }}'].addTo(map[{{ data.id }}]);
+                map[{{ data.id }}].fitBounds(vigiWidgets['{{ data.id }}'].getBounds());
                 historyEvents['{{ data.id }}'] = {}
                 //********* Add Strikes
 

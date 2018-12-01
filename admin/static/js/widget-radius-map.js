@@ -102,16 +102,6 @@ function getTimeImage(time, reftime) {
 
             setInterval(self.refreshStrikes.bind(this), 10000);
 
-     /**       //****** Add markers
-
-            var marker = L.marker(this._latlng, {
-              position: propertyBindTo('position', this),
-              map: propertyBindTo('map', this),
-              updated: propertyBindTo('updated', this),
-              title: data.name,
-              draggable:true
-            });
-            marker.addTo(this.map); **/
             this.bindPopup(function(){return '<div id="content">'+
                     '<div id="siteNotice">'+
                     '</div>'+
@@ -127,13 +117,6 @@ function getTimeImage(time, reftime) {
                     '</div>'+
                     '</div>'
             });
-            // Bind the marker map property to the LocalWidget map property
-          //  marker.bindTo('map', this);
-
-            // Bind the marker position property to the LocalWidget position
-            // property
-          //  marker.bindTo('position', this);
-          //  marker.bindTo('updated', this);
             this.on('move', function (event) {
                 if (!latlngEqual(self.approachCircle._latlng, this._latlng)) self.approachCircle.updatePos([this._latlng.lat, this._latlng.lng]);
                 if (!latlngEqual(self.nearbyCircle._latlng, this._latlng)) self.nearbyCircle.updatePos([this._latlng.lat, this._latlng.lng]);
@@ -152,11 +135,10 @@ function getTimeImage(time, reftime) {
             });
             // Show the lat and lng under the mouse cursor.
             var coordsDiv = document.getElementById('coords_'+this.device_id);
-       //     map.control.zoom({position: 'topleft'});
             map.on('mousemove', function(event) {
                 coordsDiv.textContent =
-                    'lat: ' + event.latlng.lat.toFixed(4)+ ', ' +
-                    'lng: ' + event.latlng.lng.toFixed(4);
+                    'lat: ' + event.latlng.lat.toFixed(6)+ ', ' +
+                    'lng: ' + event.latlng.lng.toFixed(6);
                 });
         },
         updateChilds(event, source) {
@@ -186,14 +168,17 @@ function getTimeImage(time, reftime) {
                 this.criticalCircle.disableEdit();
             }
         },
+        getBounds: function () {
+            return this.approachCircle.getBounds();
+        },
         addStrike: function (strike) {
             let strikeID = strike.latitude+","+strike.longitude;
             this.strikes[strikeID] = (L.marker([strike.latitude, strike.longitude], {
                                                       icon: new StrikeIcon({iconUrl: getTimeImage(strike.time)}),
                                                       time: strike.time}
                                                     ).bindPopup('<span>'+new Date(strike.time*1000).toLocaleString()+ "<br>" +
-                                                        'lat: ' + strike.latitude.toFixed(4) + '<br>' +
-                                                        'lng: ' + strike.longitude.toFixed(4) + '</span>')
+                                                        'Latitude: ' + strike.latitude.toFixed(6) + '<br>' +
+                                                        'Longitude: ' + strike.longitude.toFixed(6) + '</span>')
                                                   );
             this.strikes[strikeID].addTo(this.map);
             this.timerStrikes[strikeID] = setInterval(function(strikeID, self) {
