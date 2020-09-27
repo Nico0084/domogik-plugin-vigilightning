@@ -318,8 +318,8 @@ class VigiLightningManager(Plugin):
         self.log.info(u"Stopped lightning vigilance checking for {0}".format(self.vigiSource))
 
     def createWSClient(self):
-        port = int(round(random.random() * 40 + 8050))
-        url = 'ws://{0}:{1}'.format(self.vigiSource, port)
+        port = 3000
+        url = 'wss://ws{2}.{0}:{1}/'.format(self.vigiSource, port, int(round(random.random()*5))+1)
         self.log.info(u"Start Connection to {0}".format(url))
         self.webSockect = WSClient(url, onMessage=self.receivedData, log=self.log)
         try :

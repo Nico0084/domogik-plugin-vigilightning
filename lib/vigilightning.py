@@ -283,7 +283,7 @@ class VigiLocation:
         d = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         dkm = (EARTH_RADIUS * d) / 1000.0
         strikeTime = data['time'] / TIME_FACTOR
-#        self.log.debug ("{0} Handle Strike event at : {0}, distance {1} km / {2} deg ({3}) since {4} s".format(datetime.fromtimestamp(data['time']/TIME_FACTOR),
+#        self.log.debug ("Handle Strike event at : {0}, distance {1} km / {2} deg ({3}) since {4} s".format(datetime.fromtimestamp(data['time']/TIME_FACTOR),
 #                dkm, math.degrees(a), self.getDirection(math.degrees(a)),
 #                data['delay']))
         # Angle P1/P2 / Nord

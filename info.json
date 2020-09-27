@@ -13,11 +13,11 @@
         "domogik_min_version": "0.6.0",
         "name": "vigilightning",
         "type": "plugin",
-        "version": "0.2"
+        "version": "0.3"
     },
 
     "configuration": [{
-            "default": "ws.blitzortung.org",
+            "default": "blitzortung.org",
             "description": "URL source blitzortung.org websocket data.",
             "key": "wssource",
             "name": "data blitzortung.org site",
