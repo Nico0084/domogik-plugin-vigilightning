@@ -1,6 +1,11 @@
 =========
 Changelog
 =========
+0.4 (22-08-2022)
+------------------
+
+* Updated blitzortung websocket server connexion due to changing source and coding data.
+* Add more log for websocket server issues.
 
 0.3 (27-09-2020)
 ------------------

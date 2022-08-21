@@ -121,6 +121,9 @@
                     </div>
                 </div>
             </div>
+            <div class="row">
+                <p id="txtwsstatus" class="pull-right"style="margin-bottom: 0px;"></p>
+            </div>
         </div>
         <div class="panel-body">
             {% for loc in locationsList %}
@@ -371,22 +374,13 @@
         } else {
             $("#wsstatus").removeClass().addClass("glyphicon glyphicon-pause fa-3x").attr("title", status.Msg);
         }
+        $("#txtwsstatus").text(status.Msg);
         let color = 'error';
         if (status.Error == "")  {
-            switch (status.State) {
-             case "Calm monitoring" :
-                color = 'calm';
-                break;
-             case "CheckTimes monitoring" :
-                color = 'checktimes';
-                break;
-             case "Wait next monitoring" :
-                color = 'waitnext';
-                break;
-             case "Lightning monitoring" :
-                color = 'lightning';
-                break;
-            }
+            if (status.State.indexOf("Calm monitoring") !== -1) color = 'calm';
+            else if (status.State.indexOf("CheckTimes monitoring") !== -1) color = 'checktimes';
+            else if (status.State.indexOf("Wait next monitoring") !== -1) color = 'waitnext';
+            else if (status.State.indexOf("Lightning monitoring") !== -1) color = 'lightning';
         } else {
             new PNotify({
                 type: 'error',

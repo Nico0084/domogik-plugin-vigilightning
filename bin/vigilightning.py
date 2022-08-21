@@ -268,21 +268,21 @@ class VigiLightningManager(Plugin):
                     self._connexionError = u""
                     msg = ""
                     if self._lastStrike['time'] + self.OutputMonitoring >= currentTime :
-                        if self._connexionStatus != "Lightning monitoring" or self._lastStrike['time'] != lastEvent :
+                        if "Lightning monitoring" not in self._connexionStatus or self._lastStrike['time'] != lastEvent :
                             msg = u"Monitoring source on output event mode up to {0}".format(datetime.fromtimestamp(self._lastStrike['time'] + self.OutputMonitoring).strftime('%H:%M:%S (%Y-%m-%d)'))
                             self.log.debug(msg)
                             lastEvent = self._lastStrike['time']
-                        self._connexionStatus = "Lightning monitoring"
+                        self._connexionStatus = "Lightning monitoring, {0} strikes recieved".format(self.webSockect.cptStrike)
                         checkConnection = True
                     else :
                         if self._startCheck + self.CalmMonitoring >= currentTime :
-                            if self._connexionStatus != "Calm monitoring" :
+                            if "Calm monitoring" not in self._connexionStatus :
                                 msg = u"Monitoring source on calm mode up to {0}".format(datetime.fromtimestamp(self._startCheck + self.CalmMonitoring).strftime('%H:%M:%S (%Y-%m-%d)'))
                                 self.log.debug(msg)
-                            self._connexionStatus = "Calm monitoring"
+                            self._connexionStatus = "Calm monitoring, {0} strikes recieved".format(self.webSockect.cptStrike)
                             checkConnection = True
                         elif self._EndCheck + self.checkTimes <= currentTime :
-                            if self._connexionStatus != "CheckTimes monitoring" :
+                            if "CheckTimes monitoring" not in self._connexionStatus :
                                 msg = u"Status on checkTimes, restart monitoring"
                                 self.log.debug(msg)
                             self._connexionStatus = "CheckTimes monitoring"
@@ -303,9 +303,14 @@ class VigiLightningManager(Plugin):
                         if checkConnection :
                             self._EndCheck = currentTime
                             if self.webSockect is None :
+                                self.log.debug(u"**** Reset and reconnect wss / checkConnection : {0} / webSockect : {1} / connexionStatus : {2}".format(checkConnection, self.webSockect, self._connexionStatus))
                                 self._startCheck = 0
                                 self.createWSClient()
                                 self._startCheck = currentTime
+                            elif self.webSockect.connected == False :
+                                self.log.debug(u"**** Losted wss, reconnecting / checkConnection : {0} / webSockect : {1} / connexionStatus : {2}".format(checkConnection, self.webSockect, self._connexionStatus))
+                                self.webSockect = None
+                                self.createWSClient()
                     if msg != "" :
                         self.publishMsg("vigilightning.plugin.getwsstatus", self.getWSStatus(msg))
                 except :
@@ -318,8 +323,16 @@ class VigiLightningManager(Plugin):
         self.log.info(u"Stopped lightning vigilance checking for {0}".format(self.vigiSource))
 
     def createWSClient(self):
-        port = 3000
-        url = 'wss://ws{2}.{0}:{1}/'.format(self.vigiSource, port, int(round(random.random()*5))+1)
+        port = 443
+        rnd = random.random()*3;
+        if rnd < 1.0 :
+            ws = 1
+        elif rnd < 2.0 :
+            ws = 7
+        elif rnd <= 3.0 :
+            ws = 8
+        """ url = 'wss://ws{2}.{0}:{1}/'.format(self.vigiSource, port, int(round(random.random()*5))+1) """
+        url = 'wss://ws{2}.{0}:{1}/'.format(self.vigiSource, port, ws)
         self.log.info(u"Start Connection to {0}".format(url))
         self.webSockect = WSClient(url, onMessage=self.receivedData, log=self.log)
         try :
@@ -341,6 +354,9 @@ class VigiLightningManager(Plugin):
             self._connexionError = u""
             for id in self.vigi_List :
                 self.vigi_List[id].receiveStrike(data)
+        elif u"fail" in data :
+            self.log.error(data)
+            self._connexionError = data
         else :
             self.log.warning(u"Receive unknown data : {0}".format(data))
             self._connexionError = u"Receive unknown data : {0}".format(data)
@@ -360,21 +376,51 @@ class WSClient(WebSocketClient):
         self.connected = False
         self.log = log
         self._onMessage = onMessage
+        self.CptStrike = 0
 
     def opened(self):
         self.log.info(u"Opening {0}".format(self.url))
         self.send('{"sig":false}')
+        self.send('{"a":767}')
         self.log.info(u"Connected to {0}".format(self.url))
         self.connected = True
         self._lastConnection = time.time()
+        self.cptStrike = 0
 
     def closed(self, code, reason=None):
-        self.log.info(u"Closed down {0}, {1} {2}".format(self.url, code, reason))
+        self.log.info(u"Closed down {0}, {1} {2} / nb Strike resceived = {3}".format(self.url, code, reason, self.cptStrike))
         self.connected = False
 
+    def decode(self, a):
+        b=u"{0}".format(a)
+        e = {}
+        d = list(b)
+        c = d[0]
+        f = c
+        g = [c]
+        h = 256
+        o = h
+        for b in range(1, len(d)):
+            a = ord(d[b])
+            a = d[b] if h > a else e.get(a, f + c)
+            g.append(a)
+            c = a[0]
+            e[o] = f + c
+            o+=1
+            f = a
+#        print("".join(g))
+        return "".join(g)
+
     def received_message(self, m):
-        m = json.loads(str(m))
-        self._onMessage(m)
+#        self.log.debug(u"************* Strike event received {0}".format(m))
+        try :
+            msg = json.loads(self.decode(m))
+        except :
+            self.log.error(u"Decoding wss strike fail : {0} Text = {1}".format(traceback.format_exc(), m))
+            self._onMessage(u"Decoding wss strike fail : {0} Text = {1}".format(traceback.format_exc(), m))
+        else :
+            self.cptStrike += 1
+            self._onMessage(msg)
 
 if __name__ == "__main__":
     vigilightning = VigiLightningManager()
