@@ -255,7 +255,7 @@ class VigiLightningManager(Plugin):
             If no event detected next to location websocket is closed.
         """
         self.run = True
-        self._lastUpdate = 0
+        self._lastUpdate = time.time()
         self.vigiSource
         self._EndCheck = time.time() - self.checkTimes
         lastEvent = 0
@@ -272,14 +272,14 @@ class VigiLightningManager(Plugin):
                             msg = u"Monitoring source on output event mode up to {0}".format(datetime.fromtimestamp(self._lastStrike['time'] + self.OutputMonitoring).strftime('%H:%M:%S (%Y-%m-%d)'))
                             self.log.debug(msg)
                             lastEvent = self._lastStrike['time']
-                        self._connexionStatus = "Lightning monitoring, {0} strikes recieved".format(self.webSockect.cptStrike)
+                        self._connexionStatus = "Lightning monitoring, {0} strikes recieved".format(self.webSockect.cptStrike if self.webSockect is not None else 0)
                         checkConnection = True
                     else :
                         if self._startCheck + self.CalmMonitoring >= currentTime :
                             if "Calm monitoring" not in self._connexionStatus :
                                 msg = u"Monitoring source on calm mode up to {0}".format(datetime.fromtimestamp(self._startCheck + self.CalmMonitoring).strftime('%H:%M:%S (%Y-%m-%d)'))
                                 self.log.debug(msg)
-                            self._connexionStatus = "Calm monitoring, {0} strikes recieved".format(self.webSockect.cptStrike)
+                            self._connexionStatus = "Calm monitoring, {0} strikes recieved".format(self.webSockect.cptStrike if self.webSockect is not None else 0)
                             checkConnection = True
                         elif self._EndCheck + self.checkTimes <= currentTime :
                             if "CheckTimes monitoring" not in self._connexionStatus :
@@ -302,6 +302,8 @@ class VigiLightningManager(Plugin):
                                 self._connexionStatus = "Wait next monitoring"
                         if checkConnection :
                             self._EndCheck = currentTime
+                            if self._lastUpdate + 30 < time.time() :
+                                self.log.warning(u"**** no strike recieved since {0}s, check server connection".format(time.time()-self._lastUpdate))
                             if self.webSockect is None :
                                 self.log.debug(u"**** Reset and reconnect wss / checkConnection : {0} / webSockect : {1} / connexionStatus : {2}".format(checkConnection, self.webSockect, self._connexionStatus))
                                 self._startCheck = 0
@@ -324,15 +326,8 @@ class VigiLightningManager(Plugin):
 
     def createWSClient(self):
         port = 443
-        rnd = random.random()*3;
-        if rnd < 1.0 :
-            ws = 1
-        elif rnd < 2.0 :
-            ws = 7
-        elif rnd <= 3.0 :
-            ws = 8
-        """ url = 'wss://ws{2}.{0}:{1}/'.format(self.vigiSource, port, int(round(random.random()*5))+1) """
-        url = 'wss://ws{2}.{0}:{1}/'.format(self.vigiSource, port, ws)
+        hosts = ["1", "5", "6", "7", "8"]
+        url = 'wss://ws{2}.{0}:{1}/'.format(self.vigiSource, port, random.choice(hosts))
         self.log.info(u"Start Connection to {0}".format(url))
         self.webSockect = WSClient(url, onMessage=self.receivedData, log=self.log)
         try :
@@ -343,12 +338,17 @@ class VigiLightningManager(Plugin):
             th.start()
             self.add_stop_cb(self.webSockect.close);
             self._connexionError = u""
+            self._lastUpdate = time.time()
+#            Send confirme connection
+            self.log.info("WSClient send 418 for connected confirmation .... ")
+            self.webSockect.send('{"a": 418}')
         except :
             self.webSockect = None
             self.log.warning("WSClient to <{0}>, Create error : {1}".format(url, traceback.format_exc()))
             self._connexionError = u"Fail to connect"
 
     def receivedData(self, data):
+        self._lastUpdate = time.time()
         if set(("time", "lat", "lon", "alt", "pol", "mds", "mcg", "sig", "delay",)) <= set(data):
 #            self.log.debug(u"Strike event received, publishing to all vigilance device...")
             self._connexionError = u""
@@ -376,7 +376,7 @@ class WSClient(WebSocketClient):
         self.connected = False
         self.log = log
         self._onMessage = onMessage
-        self.CptStrike = 0
+        self.cptStrike = 0
 
     def opened(self):
         self.log.info(u"Opening {0}".format(self.url))

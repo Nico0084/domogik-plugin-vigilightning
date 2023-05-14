@@ -283,9 +283,9 @@ class VigiLocation:
         d = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         dkm = (EARTH_RADIUS * d) / 1000.0
         strikeTime = data['time'] / TIME_FACTOR
-#        self.log.debug ("Handle Strike event at : {0}, distance {1} km / {2} deg ({3}) since {4} s".format(datetime.fromtimestamp(data['time']/TIME_FACTOR),
+#        self.log.debug ("'{5}' Handle Strike event at : {0}, distance {1} km / {2} deg ({3}) since {4} s".format(datetime.fromtimestamp(data['time']/TIME_FACTOR),
 #                dkm, math.degrees(a), self.getDirection(math.degrees(a)),
-#                data['delay']))
+#                data['delay'], self.device_name))
         # Angle P1/P2 / Nord
         if math.sin(rlo2-rlo1) >=0 :
             rAngle=math.acos((math.sin(rla2)-math.sin(rla1)*math.cos(d))/(math.sin(d)*math.cos(rla1)))
@@ -407,7 +407,8 @@ class VigiLocation:
             resData = ""
             if res is not None :
                 resData = res.get_data()
-                self.log.debug(u"{0} find {1} strike(s) for event alert".format(self.device_name, len(resData)))
+                self.log.debug(u"{0} find {1} strike(s) for event alert".format(self.device_name, len(resData['values'])))
+                self.log.debug(u"{0}".format(resData))
                 for strike in resData['values'] :
                     lat, lon = strike['value_str'].split(",")
                     data = {'time': strike['timestamp']*TIME_FACTOR, 'lat':  float(lat), 'lon':  float(lon), 'delay': 0}
