@@ -326,22 +326,28 @@ class VigiLightningManager(Plugin):
 
     def createWSClient(self):
         port = 443
-        hosts = ["1", "5", "6", "7", "8"]
+        hosts = ["1", "3", "7", "8"]
+        thr_name = "blitzortung_wss"
+        if thr_name in self.vigi_Threads :
+                self.log.debug(u"Try to stop thread {0} allready running".format(thr_name))
+                try:
+                    self.vigi_Threads[thr_name].join()
+                except RuntimeError:
+                    pass
+                self.log.debug(u"Thread stopped {0}".format(thr_name))
+                self.unregister_thread(self.vigi_Threads[thr_name])
         url = 'wss://ws{2}.{0}:{1}/'.format(self.vigiSource, port, random.choice(hosts))
         self.log.info(u"Start Connection to {0}".format(url))
         self.webSockect = WSClient(url, onMessage=self.receivedData, log=self.log)
         try :
             self.webSockect.connect()
-            th = threading.Thread(None, self.webSockect.run_forever, "th_WSClient_forever-vigilightining", (), {})
-            self.register_thread(th)
+            self.vigi_Threads[thr_name] = threading.Thread(None, self.webSockect.run_forever, "th_WSClient_forever-vigilightining", (), {})
             self.log.info("WSClient start forever mod to {0}".format(url))
-            th.start()
+            self.vigi_Threads[thr_name].start()
+            self.register_thread(self.vigi_Threads[thr_name])
             self.add_stop_cb(self.webSockect.close);
             self._connexionError = u""
             self._lastUpdate = time.time()
-#            Send confirme connection
-            self.log.info("WSClient send 418 for connected confirmation .... ")
-            self.webSockect.send('{"a": 418}')
         except :
             self.webSockect = None
             self.log.warning("WSClient to <{0}>, Create error : {1}".format(url, traceback.format_exc()))
@@ -379,9 +385,11 @@ class WSClient(WebSocketClient):
         self.cptStrike = 0
 
     def opened(self):
+        payload = '{"a": 111}'
         self.log.info(u"Opening {0}".format(self.url))
-        self.send('{"sig":false}')
-        self.send('{"a":767}')
+#       Send confirme connection
+        self.log.info(u"WSClient send {0} for connected confirmation .... ".format(payload))
+        self.send(payload)
         self.log.info(u"Connected to {0}".format(self.url))
         self.connected = True
         self._lastConnection = time.time()
@@ -419,6 +427,7 @@ class WSClient(WebSocketClient):
             self.log.error(u"Decoding wss strike fail : {0} Text = {1}".format(traceback.format_exc(), m))
             self._onMessage(u"Decoding wss strike fail : {0} Text = {1}".format(traceback.format_exc(), m))
         else :
+            if self.cptStrike == 1 : self.log.info(u"Connection confirmed, active strikes monitoring ... ")
             self.cptStrike += 1
             self._onMessage(msg)
 
