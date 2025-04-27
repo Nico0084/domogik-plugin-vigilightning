@@ -300,19 +300,19 @@ class VigiLightningManager(Plugin):
                                     msg = u"Monitoring source on pause, next start at {0}".format(datetime.fromtimestamp(self._EndCheck + self.checkTimes).strftime('%H:%M:%S (%Y-%m-%d)'))
                                     self.log.debug(msg)
                                 self._connexionStatus = "Wait next monitoring"
-                        if checkConnection :
-                            self._EndCheck = currentTime
-                            if self._lastUpdate + 30 < time.time() :
-                                self.log.warning(u"**** no strike recieved since {0}s, check server connection".format(time.time()-self._lastUpdate))
-                            if self.webSockect is None :
-                                self.log.debug(u"**** Reset and reconnect wss / checkConnection : {0} / webSockect : {1} / connexionStatus : {2}".format(checkConnection, self.webSockect, self._connexionStatus))
-                                self._startCheck = 0
-                                self.createWSClient()
-                                self._startCheck = currentTime
-                            elif self.webSockect.connected == False :
-                                self.log.debug(u"**** Losted wss, reconnecting / checkConnection : {0} / webSockect : {1} / connexionStatus : {2}".format(checkConnection, self.webSockect, self._connexionStatus))
-                                self.webSockect = None
-                                self.createWSClient()
+                    if checkConnection :
+                        self._EndCheck = currentTime
+                        if self._lastUpdate + 30 < time.time() :
+                            self.log.warning(u"**** no strike recieved since {0}s, check server connection".format(time.time()-self._lastUpdate))
+                        if self.webSockect is None :
+                            self.log.debug(u"**** Reset and reconnect wss / checkConnection : {0} / webSockect : {1} / connexionStatus : {2}".format(checkConnection, self.webSockect, self._connexionStatus))
+                            self._startCheck = 0
+                            self.createWSClient()
+                            self._startCheck = currentTime
+                        elif not self.webSockect.connected :
+                            self.log.debug(u"**** Losted wss, reconnecting / checkConnection : {0} / webSockect : {1} / connexionStatus : {2}".format(checkConnection, self.webSockect, self._connexionStatus))
+                            self.webSockect = None
+                            self.createWSClient()
                     if msg != "" :
                         self.publishMsg("vigilightning.plugin.getwsstatus", self.getWSStatus(msg))
                 except :
